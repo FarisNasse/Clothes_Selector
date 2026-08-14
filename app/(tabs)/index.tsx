@@ -1,15 +1,21 @@
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { OutfitCard } from '@/components/OutfitCard';
-import { Pill } from '@/components/Pill';
+import { RecommendationHero } from '@/components/outfit/RecommendationHero';
+import { AppText } from '@/components/primitives/AppText';
+import { Chip } from '@/components/primitives/Chip';
+import { EmptyState } from '@/components/primitives/EmptyState';
+import { Surface } from '@/components/primitives/Surface';
 import { Screen } from '@/components/Screen';
-import { Type } from '@/components/Type';
 import { generateOutfits } from '@/features/recommendations/engine';
 import { demoStyleProfile } from '@/fixtures/demoWardrobe';
 import { useSession } from '@/providers/SessionProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
-import { colors, radii, spacing } from '@/theme/tokens';
+import { semanticColors } from '@/design/colors';
+import { radius } from '@/design/radii';
+import { space } from '@/design/spacing';
 import type { Occasion } from '@/types/domain';
 
 const occasionLabels: { key: Occasion; label: string }[] = [
@@ -20,6 +26,15 @@ const occasionLabels: { key: Occasion; label: string }[] = [
   { key: 'going_out', label: 'Going out' },
   { key: 'formal', label: 'Formal' },
 ];
+
+const recommendationTitles: Record<Occasion, string> = {
+  everyday: 'Easy, without looking accidental.',
+  work: 'Polished without overthinking it.',
+  dinner: 'Dinner, solved.',
+  date: 'Confident. Not overdone.',
+  going_out: 'A little sharper tonight.',
+  formal: 'The right level of serious.',
+};
 
 export default function TodayScreen() {
   const { garments, recordWear } = useWardrobe();
@@ -60,34 +75,39 @@ export default function TodayScreen() {
   const recommendation = recommendations[recommendationIndex % Math.max(recommendations.length, 1)];
 
   return (
-    <Screen>
-      <View style={styles.topline}>
-        <View>
-          <Type variant="eyebrow">{todayLabel}</Type>
-          <Type variant="display">{greeting}</Type>
+    <Screen maxWidth={820}>
+      <View style={styles.header}>
+        <View style={styles.headerCopy}>
+          <AppText variant="eyebrow">{todayLabel}</AppText>
+          <AppText variant="displayXL">{greeting}</AppText>
         </View>
         {isDemo ? (
           <View style={styles.demoBadge}>
-            <Type style={styles.demoText}>PROPOSAL DEMO</Type>
+            <AppText variant="micro" style={styles.demoText}>DEMO</AppText>
           </View>
         ) : null}
       </View>
 
-      <View style={styles.weatherCard}>
-        <View>
-          <Type variant="eyebrow">{isDemo ? 'Demo weather' : 'Weather integration pending'}</Type>
-          <Type variant="title" style={styles.weatherTitle}>62°F · Light rain</Type>
+      <Surface variant="sunken" style={styles.weatherStrip}>
+        <View style={styles.weatherIcon}>
+          <Ionicons name="rainy-outline" size={19} color={semanticColors.accent.forest} />
         </View>
-        <Type variant="muted" style={styles.weatherDetail}>
-          Rain risk increases later today. Water-resistant layers receive a scoring boost.
-        </Type>
-      </View>
+        <View style={styles.weatherCopy}>
+          <AppText variant="bodySmall" style={styles.weatherTitle}>62°F · Light rain</AppText>
+          <AppText variant="metadata">Water-resistant layers are favored later today.</AppText>
+        </View>
+        <AppText variant="metadata">35%</AppText>
+      </Surface>
 
-      <View style={styles.section}>
-        <Type variant="title">What are you dressing for?</Type>
-        <View style={styles.pills}>
+      <View style={styles.occasionSection}>
+        <AppText variant="heading">What are you dressing for?</AppText>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.occasionRail}
+        >
           {occasionLabels.map((item) => (
-            <Pill
+            <Chip
               key={item.key}
               label={item.label}
               selected={occasion === item.key}
@@ -97,21 +117,20 @@ export default function TodayScreen() {
               }}
             />
           ))}
-        </View>
+        </ScrollView>
       </View>
 
       {recommendation ? (
-        <OutfitCard
+        <RecommendationHero
           recommendation={recommendation}
+          title={recommendationTitles[occasion]}
+          contextLabel={`${occasionLabels.find((item) => item.key === occasion)?.label ?? 'Today'} · from your wardrobe`}
           wearLoading={recordingWear}
           onWear={async () => {
             try {
               setRecordingWear(true);
               await recordWear(recommendation, occasion, weather);
-              Alert.alert(
-                'Outfit recorded',
-                'Wear history and garment utilization have been updated. This is the product north-star event.',
-              );
+              Alert.alert('Locked in', 'This wear is now part of your wardrobe history.');
             } catch (caught) {
               Alert.alert('Could not record outfit', caught instanceof Error ? caught.message : 'Please try again.');
             } finally {
@@ -121,70 +140,78 @@ export default function TodayScreen() {
           onAnother={() => setRecommendationIndex((current) => current + 1)}
         />
       ) : (
-        <View style={styles.emptyCard}>
-          <Type variant="title">Build your wardrobe first.</Type>
-          <Type variant="muted">
-            Add at least one top, bottom, and pair of shoes before requesting an outfit.
-          </Type>
-        </View>
+        <EmptyState
+          title="Your wardrobe needs a few more pieces."
+          detail="Add at least one top, one bottom, and one pair of shoes. Then Clothes Selector can begin assembling complete looks."
+          actionLabel="Add a garment"
+          onAction={() => router.push('/garment/add')}
+        />
       )}
 
-      <View style={styles.signalRow}>
-        <View style={styles.signalCard}>
-          <Type variant="eyebrow">Wardrobe</Type>
-          <Type variant="title">{garments.length}</Type>
-          <Type variant="muted">items indexed</Type>
-        </View>
-        <View style={styles.signalCard}>
-          <Type variant="eyebrow">Signal</Type>
-          <Type variant="title">Wear</Type>
-          <Type variant="muted">beats a like</Type>
-        </View>
+      <View style={styles.insightSection}>
+        <AppText variant="eyebrow">Wardrobe insight</AppText>
+        <Surface variant="interactive" style={styles.insightCard}>
+          <View style={styles.insightIcon}>
+            <Ionicons name="time-outline" size={20} color={semanticColors.accent.bronze} />
+          </View>
+          <View style={styles.insightCopy}>
+            <AppText variant="bodyLarge">Your least-worn layer deserves another look.</AppText>
+            <AppText variant="metadata">
+              Clothes Selector can favor strong pieces that have fallen out of rotation instead of repeating the same safe outfit.
+            </AppText>
+          </View>
+        </Surface>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  topline: {
-    paddingTop: spacing.md,
-    gap: spacing.md,
+  header: {
+    paddingTop: space.lg,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: space.lg,
   },
+  headerCopy: { flex: 1, gap: space.sm },
   demoBadge: {
-    borderRadius: radii.pill,
-    backgroundColor: colors.brassSoft,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    marginTop: 3,
+    minHeight: 28,
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    paddingHorizontal: space.md,
+    backgroundColor: semanticColors.accent.bronzeMist,
   },
-  demoText: { color: colors.brass, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  weatherCard: {
-    marginTop: spacing.xl,
-    backgroundColor: colors.forest,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
+  demoText: { color: semanticColors.accent.bronze, fontWeight: '800', letterSpacing: 0.9 },
+  weatherStrip: {
+    marginTop: space.xxl,
+    padding: space.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
   },
-  weatherTitle: { color: colors.white },
-  weatherDetail: { color: '#D7E0DB' },
-  section: { marginVertical: spacing.xl, gap: spacing.md },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  emptyCard: {
-    padding: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.sm,
+  weatherIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: semanticColors.accent.forestMist,
   },
-  signalRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
-  signalCard: {
-    flex: 1,
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    gap: 2,
+  weatherCopy: { flex: 1, gap: 2 },
+  weatherTitle: { fontWeight: '700' },
+  occasionSection: { marginVertical: space.section, gap: space.lg },
+  occasionRail: { gap: space.sm, paddingRight: space.xxl },
+  insightSection: { marginTop: space.sectionLarge, gap: space.md },
+  insightCard: { padding: space.lg, flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
+  insightIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: semanticColors.accent.bronzeMist,
   },
+  insightCopy: { flex: 1, gap: space.sm },
 });

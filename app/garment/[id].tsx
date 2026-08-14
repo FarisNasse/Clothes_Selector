@@ -1,16 +1,21 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
-import { OutfitCard } from '@/components/OutfitCard';
-import { Pill } from '@/components/Pill';
+import { GarmentHero } from '@/components/garment/GarmentHero';
+import { RecommendationHero } from '@/components/outfit/RecommendationHero';
+import { AppText } from '@/components/primitives/AppText';
+import { Chip } from '@/components/primitives/Chip';
+import { EmptyState } from '@/components/primitives/EmptyState';
+import { Surface } from '@/components/primitives/Surface';
 import { Screen } from '@/components/Screen';
 import { SectionHeader } from '@/components/SectionHeader';
-import { Type } from '@/components/Type';
+import { semanticColors } from '@/design/colors';
+import { radius } from '@/design/radii';
+import { space } from '@/design/spacing';
 import { generateOutfits } from '@/features/recommendations/engine';
 import { demoStyleProfile } from '@/fixtures/demoWardrobe';
 import { useWardrobe } from '@/providers/WardrobeProvider';
-import { colors, radii, spacing } from '@/theme/tokens';
 import type { Occasion } from '@/types/domain';
 
 const stylingWeather = { temperatureF: 64, precipitationProbability: 0.15, raining: false };
@@ -20,6 +25,7 @@ const occasionLabels: { key: Occasion; label: string }[] = [
   { key: 'dinner', label: 'Smart casual' },
   { key: 'date', label: 'Date' },
   { key: 'work', label: 'Work' },
+  { key: 'going_out', label: 'Going out' },
 ];
 
 export default function GarmentDetailScreen() {
@@ -47,10 +53,12 @@ export default function GarmentDetailScreen() {
 
   if (!garment) {
     return (
-      <Screen>
-        <View style={styles.missing}>
-          <Type variant="title">Garment not found.</Type>
-          <Type variant="muted">It may have been removed from the wardrobe.</Type>
+      <Screen maxWidth={820}>
+        <View style={styles.missingWrap}>
+          <EmptyState
+            title="This garment is no longer in your wardrobe."
+            detail="It may have been removed or the wardrobe has not finished loading yet."
+          />
         </View>
       </Screen>
     );
@@ -59,31 +67,20 @@ export default function GarmentDetailScreen() {
   const recommendation = recommendations[index % Math.max(recommendations.length, 1)];
 
   return (
-    <Screen>
-      <View style={styles.hero}>
-        <Type variant="eyebrow">{garment.brand ?? 'Wardrobe item'}</Type>
-        <Type variant="display">{garment.name}</Type>
-        <Type variant="muted">
-          {garment.primaryColor} · {garment.subcategory} · {garment.fit} fit
-        </Type>
-      </View>
-
-      <View style={styles.metadataGrid}>
-        <Metric label="Formality" value={`${garment.formality}/10`} />
-        <Metric label="Warmth" value={`${garment.warmth}/10`} />
-        <Metric label="Worn" value={`${garment.wearCount}×`} />
-        <Metric label="AI confidence" value={garment.aiConfidence ? `${Math.round(garment.aiConfidence * 100)}%` : 'Manual'} />
+    <Screen maxWidth={860}>
+      <View style={styles.heroWrap}>
+        <GarmentHero garment={garment} />
       </View>
 
       <View style={styles.section}>
         <SectionHeader
           eyebrow="Style this"
-          title="Build around this piece"
-          detail="The selected garment remains locked; only compatible owned pieces may fill the remaining slots."
+          title="Keep this piece. Rebuild everything around it."
+          detail="The selected garment remains visually locked while Clothes Selector searches your owned wardrobe for compatible pieces."
         />
-        <View style={styles.pills}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.occasionRail}>
           {occasionLabels.map((item) => (
-            <Pill
+            <Chip
               key={item.key}
               label={item.label}
               selected={occasion === item.key}
@@ -93,18 +90,21 @@ export default function GarmentDetailScreen() {
               }}
             />
           ))}
-        </View>
+        </ScrollView>
       </View>
 
       {recommendation ? (
-        <OutfitCard
+        <RecommendationHero
           recommendation={recommendation}
+          title={`Built around ${garment.name.toLowerCase()}.`}
+          contextLabel="Locked styling session"
+          lockedGarmentId={garment.id}
           wearLoading={recordingWear}
           onWear={async () => {
             try {
               setRecordingWear(true);
               await recordWear(recommendation, occasion, stylingWeather);
-              Alert.alert('Outfit recorded', 'Wear history and garment utilization have been updated.');
+              Alert.alert('Outfit recorded', 'This styling choice is now part of your wear history.');
             } catch (caught) {
               Alert.alert('Could not record outfit', caught instanceof Error ? caught.message : 'Please try again.');
             } finally {
@@ -114,64 +114,53 @@ export default function GarmentDetailScreen() {
           onAnother={() => setIndex((current) => current + 1)}
         />
       ) : (
-        <View style={styles.noMatch}>
-          <Type variant="title">No strong match yet.</Type>
-          <Type variant="muted">
-            The current wardrobe does not have enough compatible pieces for this occasion. This is preferable to inventing a garment the user does not own.
-          </Type>
-        </View>
+        <EmptyState
+          title="No complete look is available yet."
+          detail="Add compatible tops, bottoms, or footwear and this garment can become the anchor for a full outfit."
+        />
       )}
 
-      <View style={styles.section}>
-        <SectionHeader eyebrow="Attributes" title="Structured garment profile" />
-        <View style={styles.attributeCard}>
-          <Attribute label="Color" value={garment.primaryColor} />
+      <View style={styles.sectionLarge}>
+        <SectionHeader eyebrow="Piece profile" title="What Clothes Selector knows" />
+        <Surface variant="interactive" style={styles.attributeCard}>
+          <Attribute label="Category" value={garment.category} />
+          <Attribute label="Material" value={garment.materials.join(', ') || 'Unknown'} />
           <Attribute label="Pattern" value={garment.pattern} />
-          <Attribute label="Materials" value={garment.materials.join(', ')} />
-          <Attribute label="Seasons" value={garment.seasons.join(', ')} />
-          <Attribute label="Style" value={garment.styleTags.join(', ')} />
-        </View>
+          <Attribute label="Formality" value={`${garment.formality}/10`} />
+          <Attribute label="Warmth" value={`${garment.warmth}/10`} />
+          <Attribute label="Weather" value={garment.waterproof ? 'Water resistant' : 'Dry weather'} />
+          <Attribute label="Seasons" value={garment.seasons.join(', ')} last />
+        </Surface>
       </View>
     </Screen>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Attribute({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
   return (
-    <View style={styles.metric}>
-      <Type variant="eyebrow">{label}</Type>
-      <Type variant="title">{value}</Type>
-    </View>
-  );
-}
-
-function Attribute({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.attributeRow}>
-      <Type style={styles.attributeLabel}>{label}</Type>
-      <Type variant="muted" style={styles.attributeValue}>
-        {value}
-      </Type>
+    <View style={[styles.attributeRow, !last && styles.attributeBorder]}>
+      <AppText variant="metadata" style={styles.attributeLabel}>{label}</AppText>
+      <AppText variant="bodySmall" style={styles.attributeValue}>{value}</AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: { paddingTop: spacing.md, gap: spacing.xs },
-  missing: { paddingTop: 120, gap: spacing.sm },
-  metadataGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xl },
-  metric: { width: '48%', backgroundColor: colors.surfaceStrong, borderRadius: radii.md, padding: spacing.md, gap: 3 },
-  section: { marginTop: spacing.xl, gap: spacing.md },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  noMatch: { marginTop: spacing.md, backgroundColor: colors.brassSoft, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
-  attributeCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+  missingWrap: { paddingTop: space.sectionLarge },
+  heroWrap: { paddingTop: space.lg },
+  section: { marginTop: space.sectionLarge, gap: space.lg },
+  sectionLarge: { marginTop: space.sectionLarge, gap: space.lg },
+  occasionRail: { gap: space.sm, paddingRight: space.xxl },
+  attributeCard: { overflow: 'hidden', borderRadius: radius.lg },
+  attributeRow: {
+    minHeight: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.lg,
+    paddingHorizontal: space.lg,
   },
-  attributeRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
+  attributeBorder: { borderBottomWidth: 1, borderBottomColor: semanticColors.border.subtle },
   attributeLabel: { fontWeight: '700' },
-  attributeValue: { textTransform: 'capitalize', flex: 1, textAlign: 'right' },
+  attributeValue: { flex: 1, textAlign: 'right', textTransform: 'capitalize' },
 });

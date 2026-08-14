@@ -63,6 +63,17 @@ npm start
 
 Leave `EXPO_PUBLIC_DEMO_MODE=true` to present the application without Supabase or AI credentials.
 
+### Web dependency repair
+
+If Expo Router fails on web with `Unable to resolve "react-native-web/dist/index"`, install the SDK-compatible web runtime and realign Expo packages:
+
+```powershell
+npm run repair:web
+npx expo start --clear --web
+```
+
+The repair script runs Expo's installer for `react-dom`, `react-native-web`, and `@expo/metro-runtime`, then runs `expo install --fix` and Expo Doctor. This keeps the exact versions tied to the project's installed Expo SDK instead of hard-coding them in this patch.
+
 The demo contains a seeded menswear wardrobe and a deterministic recommendation engine. The Add Garment flow uses a clearly disclosed sample classification in demo mode so the full interaction can be shown safely without external calls.
 
 ## Connected mode

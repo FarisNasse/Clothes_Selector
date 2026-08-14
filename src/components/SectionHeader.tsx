@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Type } from '@/components/Type';
-import { spacing } from '@/theme/tokens';
+import { AppText } from '@/components/primitives/AppText';
+import { space } from '@/design/spacing';
 
 type Props = {
   eyebrow?: string;
@@ -12,13 +12,14 @@ type Props = {
 export function SectionHeader({ eyebrow, title, detail }: Props) {
   return (
     <View style={styles.root}>
-      {eyebrow ? <Type variant="eyebrow">{eyebrow}</Type> : null}
-      <Type variant="title">{title}</Type>
-      {detail ? <Type variant="muted">{detail}</Type> : null}
+      {eyebrow ? <AppText variant="eyebrow">{eyebrow}</AppText> : null}
+      <AppText variant="heading">{title}</AppText>
+      {detail ? <AppText variant="muted" style={styles.detail}>{detail}</AppText> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { gap: spacing.xs },
+  root: { gap: space.sm },
+  detail: { maxWidth: 660 },
 });

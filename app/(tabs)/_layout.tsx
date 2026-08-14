@@ -1,22 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
-import { colors } from '@/theme/tokens';
+import { semanticColors } from '@/design/colors';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.forest,
-        tabBarInactiveTintColor: colors.muted,
+        tabBarHideOnKeyboard: true,
+        tabBarActiveTintColor: semanticColors.accent.forestDeep,
+        tabBarInactiveTintColor: semanticColors.ink.tertiary,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          height: 78,
+          backgroundColor: semanticColors.canvas.elevated,
+          borderTopColor: semanticColors.border.subtle,
+          height: 82,
           paddingTop: 8,
           paddingBottom: 10,
         },
+        tabBarItemStyle: { paddingVertical: 3 },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
@@ -38,13 +40,13 @@ export default function TabLayout() {
         name="style"
         options={{
           title: 'Style',
-          tabBarIcon: ({ color, size }) => <Ionicons name="options-outline" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="layers-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: 'You',
           tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
         }}
       />

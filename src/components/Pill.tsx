@@ -1,32 +1,10 @@
-import { Pressable, StyleSheet } from 'react-native';
+import type { ComponentProps } from 'react';
 
-import { Type } from '@/components/Type';
-import { colors, radii, spacing } from '@/theme/tokens';
+import { Chip } from '@/components/primitives/Chip';
 
-type Props = {
-  label: string;
-  selected?: boolean;
-  onPress?: () => void;
-};
+type Props = ComponentProps<typeof Chip>;
 
-export function Pill({ label, selected = false, onPress }: Props) {
-  return (
-    <Pressable onPress={onPress} style={[styles.root, selected && styles.selected]}>
-      <Type style={[styles.label, selected && styles.selectedLabel]}>{label}</Type>
-    </Pressable>
-  );
+/** @deprecated Prefer Chip from components/primitives for new UI. */
+export function Pill(props: Props) {
+  return <Chip {...props} />;
 }
-
-const styles = StyleSheet.create({
-  root: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-  },
-  selected: { backgroundColor: colors.forest, borderColor: colors.forest },
-  label: { fontSize: 14, fontWeight: '600' },
-  selectedLabel: { color: colors.white },
-});

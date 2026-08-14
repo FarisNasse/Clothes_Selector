@@ -1,40 +1,53 @@
+import { semanticColors } from '@/design/colors';
+import { radius } from '@/design/radii';
+import { space } from '@/design/spacing';
+import { typography } from '@/design/typography';
+
+/**
+ * Compatibility facade for the first repository patch.
+ * New UI should prefer imports from src/design/*; older screens can migrate incrementally.
+ */
 export const colors = {
-  background: '#F4F1E9',
-  surface: '#FFFDF8',
-  surfaceStrong: '#EDE8DB',
-  ink: '#18201B',
-  muted: '#6D746F',
-  border: '#D8D2C5',
-  forest: '#203C30',
-  forestSoft: '#DDE7E1',
-  brass: '#9B7B4E',
-  brassSoft: '#EEE3D1',
-  success: '#2E684A',
-  danger: '#9D403B',
-  white: '#FFFFFF',
+  background: semanticColors.canvas.default,
+  surface: semanticColors.canvas.elevated,
+  surfaceStrong: semanticColors.canvas.sunken,
+  ink: semanticColors.ink.primary,
+  muted: semanticColors.ink.secondary,
+  border: semanticColors.border.subtle,
+  forest: semanticColors.accent.forest,
+  forestSoft: semanticColors.accent.forestMist,
+  brass: semanticColors.accent.bronze,
+  brassSoft: semanticColors.accent.bronzeMist,
+  success: semanticColors.feedback.positive,
+  danger: semanticColors.feedback.negative,
+  white: semanticColors.ink.inverse,
   black: '#111111',
 } as const;
 
 export const spacing = {
-  xs: 6,
-  sm: 10,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 44,
+  xs: space.sm,
+  sm: space.md,
+  md: space.lg,
+  lg: space.xxl,
+  xl: space.section,
+  xxl: space.sectionLarge,
 } as const;
 
 export const radii = {
-  sm: 10,
-  md: 16,
-  lg: 24,
-  pill: 999,
+  sm: radius.sm,
+  md: radius.md,
+  lg: radius.lg,
+  xl: radius.xl,
+  media: radius.media,
+  pill: radius.pill,
 } as const;
 
 export const typeScale = {
-  eyebrow: 12,
-  body: 15,
-  bodyLarge: 17,
-  title: 24,
-  display: 36,
+  eyebrow: typography.metadata,
+  body: typography.body,
+  bodyLarge: typography.bodyLarge,
+  heading: typography.heading,
+  title: typography.title,
+  display: typography.display,
+  displayXL: typography.displayXL,
 } as const;

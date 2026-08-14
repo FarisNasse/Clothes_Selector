@@ -106,3 +106,28 @@ The repository CI is configured to run install → typecheck → lint → tests 
 - background-removal provider
 
 None of these gaps require replacing the initial architecture.
+
+---
+
+# Frontend Experience-System Patch — v0.2
+
+This follow-up implements the first large slice of the proposed frontend experience architecture while preserving the v0.1 recommendation, Supabase, and garment-ingestion boundaries.
+
+## Added
+
+- semantic `src/design/` token layer
+- reusable primitive component layer
+- centralized garment visual subsystem
+- outfit flat-lay and recommendation hero subsystem
+- clothing-first Today redesign
+- searchable responsive Wardrobe redesign
+- locked-garment visual styling session
+- refreshed Style intelligence surface
+- intent-aligned **You** navigation destination
+- responsive web/tablet content widths
+- improved empty/error/loading/accessibility states
+- Windows Expo web-repair script
+
+## Dependency strategy
+
+No new UI library is silently introduced in this source patch. The existing web failure is repaired by running `npm run repair:web`, which delegates compatible dependency selection to Expo CLI and updates the local lockfile correctly. NativeWind/Reanimated/Image/Haptics remain the next dependency-focused slice rather than being mixed into an unvalidated lockfile edit.
