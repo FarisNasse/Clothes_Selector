@@ -2,7 +2,7 @@ import type { PropsWithChildren } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { recordOutfitWear } from '@/features/recommendations/repository';
-import { createGarment, listGarments } from '@/features/wardrobe/repository';
+import { createGarment, deleteGarment, listGarments, updateGarment } from '@/features/wardrobe/repository';
 import { useSession } from '@/providers/SessionProvider';
 import type { Garment, GarmentDraft, Occasion, OutfitRecommendation, WeatherContext } from '@/types/domain';
 
@@ -12,6 +12,8 @@ type WardrobeContextValue = {
   error: string | null;
   refresh: () => Promise<void>;
   addGarment: (draft: GarmentDraft) => Promise<Garment>;
+  editGarment: (garmentId: string, draft: GarmentDraft) => Promise<Garment>;
+  removeGarment: (garmentId: string) => Promise<void>;
   recordWear: (recommendation: OutfitRecommendation, occasion: Occasion, weather: WeatherContext) => Promise<void>;
 };
 
@@ -50,6 +52,38 @@ export function WardrobeProvider({ children }: PropsWithChildren) {
     [isDemo, session?.user.id],
   );
 
+  const editGarment = useCallback(
+    async (garmentId: string, draft: GarmentDraft) => {
+      const userId = isDemo ? 'demo-user' : session?.user.id;
+      if (!userId) throw new Error('You must be signed in to edit a garment.');
+
+      if (isDemo) {
+        const currentGarment = garments.find((garment) => garment.id === garmentId);
+        if (!currentGarment) throw new Error('Garment not found.');
+        const updated: Garment = { ...currentGarment, ...draft };
+        setGarments((current) => current.map((garment) => (garment.id === garmentId ? updated : garment)));
+        return updated;
+      }
+
+      const garment = await updateGarment(userId, garmentId, draft);
+      setGarments((current) => current.map((item) => (item.id === garmentId ? garment : item)));
+      return garment;
+    },
+    [garments, isDemo, session?.user.id],
+  );
+
+  const removeGarment = useCallback(
+    async (garmentId: string) => {
+      const userId = isDemo ? 'demo-user' : session?.user.id;
+      if (!userId) throw new Error('You must be signed in to delete a garment.');
+      const garment = garments.find((item) => item.id === garmentId);
+      if (!garment) throw new Error('Garment not found.');
+      await deleteGarment(userId, garment);
+      setGarments((current) => current.filter((item) => item.id !== garmentId));
+    },
+    [garments, isDemo, session?.user.id],
+  );
+
   const recordWear = useCallback(
     async (recommendation: OutfitRecommendation, occasion: Occasion, weather: WeatherContext) => {
       const userId = isDemo ? 'demo-user' : session?.user.id;
@@ -76,8 +110,8 @@ export function WardrobeProvider({ children }: PropsWithChildren) {
   );
 
   const value = useMemo(
-    () => ({ garments, loading, error, refresh, addGarment, recordWear }),
-    [addGarment, error, garments, loading, recordWear, refresh],
+    () => ({ garments, loading, error, refresh, addGarment, editGarment, removeGarment, recordWear }),
+    [addGarment, editGarment, error, garments, loading, recordWear, refresh, removeGarment],
   );
 
   return <WardrobeContext.Provider value={value}>{children}</WardrobeContext.Provider>;

@@ -10,8 +10,8 @@ import { EmptyState } from '@/components/primitives/EmptyState';
 import { Surface } from '@/components/primitives/Surface';
 import { Screen } from '@/components/Screen';
 import { generateOutfits } from '@/features/recommendations/engine';
-import { demoStyleProfile } from '@/fixtures/demoWardrobe';
 import { useSession } from '@/providers/SessionProvider';
+import { useStyleProfile } from '@/providers/StyleProfileProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
 import { semanticColors } from '@/design/colors';
 import { radius } from '@/design/radii';
@@ -39,6 +39,7 @@ const recommendationTitles: Record<Occasion, string> = {
 export default function TodayScreen() {
   const { garments, recordWear } = useWardrobe();
   const { isDemo } = useSession();
+  const { profile: styleProfile } = useStyleProfile();
   const [occasion, setOccasion] = useState<Occasion>('dinner');
   const [recommendationIndex, setRecommendationIndex] = useState(0);
   const [recordingWear, setRecordingWear] = useState(false);
@@ -66,10 +67,10 @@ export default function TodayScreen() {
         wardrobe: garments,
         occasion,
         weather,
-        styleProfile: demoStyleProfile,
+        styleProfile,
         limit: 3,
       }),
-    [garments, occasion, weather],
+    [garments, occasion, styleProfile, weather],
   );
 
   const recommendation = recommendations[recommendationIndex % Math.max(recommendations.length, 1)];

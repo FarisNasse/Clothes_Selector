@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Pill } from '@/components/Pill';
@@ -10,6 +10,7 @@ import { Type } from '@/components/Type';
 import { garmentAnalysisSchema, type GarmentAnalysis } from '@/features/wardrobe/analysisSchema';
 import { analyzeGarmentImage } from '@/features/wardrobe/analyzeGarment';
 import { analysisToDraft } from '@/features/wardrobe/draft';
+import { discardStagedGarmentImage } from '@/features/wardrobe/stagedImage';
 import { useSession } from '@/providers/SessionProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
 import { colors, radii, spacing } from '@/theme/tokens';
@@ -24,8 +25,15 @@ export default function AddGarmentScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingStoragePath = useRef<string | null>(null);
 
-  async function chooseImage(source: 'camera' | 'library') {
+  useEffect(() => {
+    return () => {
+      if (pendingStoragePath.current) void discardStagedGarmentImage(pendingStoragePath.current);
+    };
+  }, []);
+
+  async function chooseImage(source: 'camera' | 'library', replaceExisting = true) {
     setError(null);
 
     const permission =
@@ -50,6 +58,15 @@ export default function AddGarmentScreen() {
     const selected = result.assets?.[0];
     if (result.canceled || !selected) return;
 
+    if (replaceExisting && pendingStoragePath.current) {
+      try {
+        await discardStagedGarmentImage(pendingStoragePath.current);
+      } catch {
+        // Do not block a new capture because stale-image cleanup failed.
+      }
+      pendingStoragePath.current = null;
+    }
+
     setAsset(selected);
     setAnalysis(null);
     setStoragePath(null);
@@ -72,6 +89,7 @@ export default function AddGarmentScreen() {
       });
       setAnalysis(result.analysis);
       setStoragePath(result.storagePath);
+      pendingStoragePath.current = result.storagePath;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not analyze the garment.');
     } finally {
@@ -83,7 +101,7 @@ export default function AddGarmentScreen() {
     setAnalysis((current) => (current ? { ...current, [key]: value } : current));
   }
 
-  async function save() {
+  async function save(next: 'done' | 'another' = 'done') {
     if (!analysis) return;
     const validated = garmentAnalysisSchema.safeParse(analysis);
     if (!validated.success) {
@@ -94,6 +112,17 @@ export default function AddGarmentScreen() {
     try {
       setSaving(true);
       await addGarment(analysisToDraft(validated.data, storagePath));
+      pendingStoragePath.current = null;
+
+      if (next === 'another') {
+        setAsset(null);
+        setAnalysis(null);
+        setStoragePath(null);
+        setError(null);
+        await chooseImage('camera', false);
+        return;
+      }
+
       Alert.alert('Garment added', 'The item is now available to the recommendation engine.', [
         { text: 'Done', onPress: () => router.back() },
       ]);
@@ -108,9 +137,9 @@ export default function AddGarmentScreen() {
     <Screen>
       <View style={styles.header}>
         <Type variant="eyebrow">Wardrobe ingestion</Type>
-        <Type variant="display">Add one piece.</Type>
+        <Type variant="display">Build your wardrobe.</Type>
         <Type variant="muted">
-          Photograph the garment clearly. AI proposes structured metadata; you remain the final authority before it enters the wardrobe.
+          Photograph the garment clearly. Confirm the AI details, then keep scanning without leaving this screen.
         </Type>
       </View>
 
@@ -196,7 +225,13 @@ export default function AddGarmentScreen() {
             <Metadata label="Pattern" value={analysis.pattern} />
           </View>
 
-          <PrimaryButton label="Add to wardrobe" loading={saving} onPress={() => void save()} />
+          <PrimaryButton label="Add to wardrobe" loading={saving} onPress={() => void save('done')} />
+          <PrimaryButton
+            label="Add & photograph another"
+            variant="secondary"
+            loading={saving}
+            onPress={() => void save('another')}
+          />
           <Type variant="muted" style={styles.disclosure}>
             {isDemo
               ? 'Demo mode uses a deterministic sample classification so the proposal can be presented without external credentials.'

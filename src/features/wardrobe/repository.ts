@@ -3,6 +3,13 @@ import { env } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
 import type { Garment, GarmentDraft } from '@/types/domain';
 
+const IMAGE_BUCKET = 'garment-images';
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const SIGNED_URL_CACHE_MS = 50 * 60 * 1000;
+
+type SignedUrlCacheEntry = { url: string; expiresAt: number };
+const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
+
 function rowToGarment(row: Record<string, unknown>): Garment {
   return {
     id: String(row.id),
@@ -30,27 +37,45 @@ function rowToGarment(row: Record<string, unknown>): Garment {
   };
 }
 
-export async function listGarments(userId?: string): Promise<Garment[]> {
-  if (env.demoMode || !supabase || !userId) return demoWardrobe;
+async function withSignedImages(garments: Garment[]): Promise<Garment[]> {
+  if (!supabase || env.demoMode) return garments;
 
-  const { data, error } = await supabase.from('garments').select('*').order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((row) => rowToGarment(row as Record<string, unknown>));
-}
+  const now = Date.now();
+  const pathsToSign = [...new Set(
+    garments
+      .map((garment) => garment.storagePath)
+      .filter((path): path is string => Boolean(path))
+      .filter((path) => {
+        const cached = signedUrlCache.get(path);
+        return !cached || cached.expiresAt <= now;
+      }),
+  )];
 
-export async function createGarment(userId: string, draft: GarmentDraft): Promise<Garment> {
-  if (env.demoMode || !supabase) {
-    return {
-      ...draft,
-      id: `demo-${Date.now()}`,
-      userId: 'demo-user',
-      wearCount: 0,
-      lastWornAt: null,
-    };
+  if (pathsToSign.length > 0) {
+    const { data, error } = await supabase.storage
+      .from(IMAGE_BUCKET)
+      .createSignedUrls(pathsToSign, SIGNED_URL_TTL_SECONDS);
+
+    if (error) throw error;
+
+    for (const result of data ?? []) {
+      if (result.path && result.signedUrl) {
+        signedUrlCache.set(result.path, {
+          url: result.signedUrl,
+          expiresAt: now + SIGNED_URL_CACHE_MS,
+        });
+      }
+    }
   }
 
-  const payload = {
-    user_id: userId,
+  return garments.map((garment) => {
+    if (!garment.storagePath) return garment;
+    return { ...garment, imageUrl: signedUrlCache.get(garment.storagePath)?.url ?? null };
+  });
+}
+
+function draftToChanges(draft: GarmentDraft) {
+  return {
     category: draft.category,
     subcategory: draft.subcategory,
     name: draft.name,
@@ -69,8 +94,77 @@ export async function createGarment(userId: string, draft: GarmentDraft): Promis
     purchase_price: draft.purchasePrice,
     ai_confidence: draft.aiConfidence,
   };
+}
 
-  const { data, error } = await supabase.from('garments').insert(payload).select('*').single();
+export async function listGarments(userId?: string): Promise<Garment[]> {
+  if (env.demoMode) return demoWardrobe;
+  if (!supabase || !userId) return [];
+
+  const { data, error } = await supabase
+    .from('garments')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
   if (error) throw error;
-  return rowToGarment(data as Record<string, unknown>);
+  return withSignedImages((data ?? []).map((row) => rowToGarment(row as Record<string, unknown>)));
+}
+
+export async function createGarment(userId: string, draft: GarmentDraft): Promise<Garment> {
+  if (env.demoMode) {
+    return {
+      ...draft,
+      id: `demo-${Date.now()}`,
+      userId: 'demo-user',
+      wearCount: 0,
+      lastWornAt: null,
+    };
+  }
+  if (!supabase) throw new Error('Supabase is not configured.');
+
+  const { data, error } = await supabase
+    .from('garments')
+    .insert({ user_id: userId, ...draftToChanges(draft) })
+    .select('*')
+    .single();
+  if (error) throw error;
+  const [garment] = await withSignedImages([rowToGarment(data as Record<string, unknown>)]);
+  return garment;
+}
+
+export async function updateGarment(userId: string, garmentId: string, draft: GarmentDraft): Promise<Garment> {
+  if (env.demoMode) {
+    return {
+      ...draft,
+      id: garmentId,
+      userId: 'demo-user',
+      wearCount: 0,
+      lastWornAt: null,
+    };
+  }
+  if (!supabase) throw new Error('Supabase is not configured.');
+
+  const { data, error } = await supabase
+    .from('garments')
+    .update(draftToChanges(draft))
+    .eq('id', garmentId)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+  if (error) throw error;
+  const [garment] = await withSignedImages([rowToGarment(data as Record<string, unknown>)]);
+  return garment;
+}
+
+export async function deleteGarment(userId: string, garment: Garment): Promise<void> {
+  if (env.demoMode) return;
+  if (!supabase) throw new Error('Supabase is not configured.');
+
+  // Remove the database row first. If that fails, the image remains recoverable.
+  const { error } = await supabase.from('garments').delete().eq('id', garment.id).eq('user_id', userId);
+  if (error) throw error;
+
+  if (garment.storagePath) {
+    const { error: storageError } = await supabase.storage.from(IMAGE_BUCKET).remove([garment.storagePath]);
+    if (!storageError) signedUrlCache.delete(garment.storagePath);
+  }
 }

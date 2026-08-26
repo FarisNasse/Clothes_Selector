@@ -1,10 +1,11 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
 import { GarmentHero } from '@/components/garment/GarmentHero';
 import { RecommendationHero } from '@/components/outfit/RecommendationHero';
 import { AppText } from '@/components/primitives/AppText';
+import { Button } from '@/components/primitives/Button';
 import { Chip } from '@/components/primitives/Chip';
 import { EmptyState } from '@/components/primitives/EmptyState';
 import { Surface } from '@/components/primitives/Surface';
@@ -14,7 +15,7 @@ import { semanticColors } from '@/design/colors';
 import { radius } from '@/design/radii';
 import { space } from '@/design/spacing';
 import { generateOutfits } from '@/features/recommendations/engine';
-import { demoStyleProfile } from '@/fixtures/demoWardrobe';
+import { useStyleProfile } from '@/providers/StyleProfileProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
 import type { Occasion } from '@/types/domain';
 
@@ -31,6 +32,7 @@ const occasionLabels: { key: Occasion; label: string }[] = [
 export default function GarmentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { garments, recordWear } = useWardrobe();
+  const { profile: styleProfile } = useStyleProfile();
   const [occasion, setOccasion] = useState<Occasion>('dinner');
   const [index, setIndex] = useState(0);
   const [recordingWear, setRecordingWear] = useState(false);
@@ -43,12 +45,12 @@ export default function GarmentDetailScreen() {
             wardrobe: garments,
             occasion,
             weather: stylingWeather,
-            styleProfile: demoStyleProfile,
+            styleProfile,
             lockedGarmentId: garment.id,
             limit: 3,
           })
         : [],
-    [garment, garments, occasion],
+    [garment, garments, occasion, styleProfile],
   );
 
   if (!garment) {
@@ -70,6 +72,9 @@ export default function GarmentDetailScreen() {
     <Screen maxWidth={860}>
       <View style={styles.heroWrap}>
         <GarmentHero garment={garment} />
+        <View style={styles.heroActions}>
+          <Button label="Edit garment" variant="secondary" icon="create-outline" onPress={() => router.push({ pathname: '/garment/edit/[id]', params: { id: garment.id } })} />
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -147,7 +152,8 @@ function Attribute({ label, value, last = false }: { label: string; value: strin
 
 const styles = StyleSheet.create({
   missingWrap: { paddingTop: space.sectionLarge },
-  heroWrap: { paddingTop: space.lg },
+  heroWrap: { paddingTop: space.lg, gap: space.lg },
+  heroActions: { alignItems: 'flex-start' },
   section: { marginTop: space.sectionLarge, gap: space.lg },
   sectionLarge: { marginTop: space.sectionLarge, gap: space.lg },
   occasionRail: { gap: space.sm, paddingRight: space.xxl },
