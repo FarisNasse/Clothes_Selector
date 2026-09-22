@@ -1,67 +1,73 @@
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-import { AppText } from '@/components/primitives/AppText';
-import { semanticColors } from '@/design/colors';
+import { AppText } from './AppText';
+import { AnimatedPressable } from '@/components/motion/AnimatedPressable';
+import { useExperience } from '@/providers/ExperienceProvider';
 import { radius } from '@/design/radii';
 import { space } from '@/design/spacing';
-
-type Variant = 'primary' | 'secondary' | 'quiet';
-
 type Props = {
   label: string;
   onPress: () => void;
-  variant?: Variant;
+  variant?: 'primary' | 'secondary' | 'quiet' | 'danger';
   loading?: boolean;
   disabled?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
+  accessibilityLabel?: string;
 };
-
-export function Button({ label, onPress, variant = 'primary', loading = false, disabled = false, icon }: Props) {
-  const foreground = variant === 'primary' ? semanticColors.ink.inverse : semanticColors.ink.primary;
+export function Button({
+  label,
+  onPress,
+  variant = 'primary',
+  loading = false,
+  disabled = false,
+  icon,
+  accessibilityLabel,
+}: Props) {
+  const { colors: c } = useExperience();
+  const foreground =
+    variant === 'primary'
+      ? c.ink.inverse
+      : variant === 'danger'
+        ? c.feedback.negative
+        : c.ink.primary;
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
       disabled={disabled || loading}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.base,
-        styles[variant],
-        pressed && styles.pressed,
-        (disabled || loading) && styles.disabled,
-      ]}
+      style={{
+        minHeight: 52,
+        paddingVertical: space.md,
+        paddingHorizontal: space.xl,
+        borderRadius: radius.pill,
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: disabled ? 0.45 : 1,
+        backgroundColor:
+          variant === 'primary'
+            ? c.accent.forestDeep
+            : variant === 'quiet'
+              ? 'transparent'
+              : c.canvas.elevated,
+        borderWidth: variant === 'secondary' || variant === 'danger' ? 1 : 0,
+        borderColor: c.border.strong,
+      }}
     >
-      {loading ? (
-        <ActivityIndicator color={foreground} />
-      ) : (
-        <View style={styles.content}>
-          {icon ? <Ionicons name={icon} size={17} color={foreground} /> : null}
-          <AppText variant="body" style={[styles.label, { color: foreground }]}>
-            {label}
-          </AppText>
-        </View>
-      )}
-    </Pressable>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+        {loading ? (
+          <ActivityIndicator size="small" color={foreground} />
+        ) : icon ? (
+          <Ionicons name={icon} size={18} color={foreground} />
+        ) : null}
+        <AppText
+          variant="bodySmall"
+          style={{ color: foreground, fontWeight: '600', flexShrink: 1 }}
+        >
+          {label}
+        </AppText>
+      </View>
+    </AnimatedPressable>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.md,
-    paddingHorizontal: space.xl,
-  },
-  content: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  primary: { backgroundColor: semanticColors.accent.forestDeep },
-  secondary: {
-    backgroundColor: semanticColors.canvas.elevated,
-    borderWidth: 1,
-    borderColor: semanticColors.border.strong,
-  },
-  quiet: { backgroundColor: semanticColors.accent.forestMist },
-  label: { fontWeight: '700' },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
-  disabled: { opacity: 0.42 },
-});

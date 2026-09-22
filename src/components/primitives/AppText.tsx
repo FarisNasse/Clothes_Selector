@@ -1,50 +1,35 @@
-import type { PropsWithChildren } from 'react';
-import { StyleSheet, Text, type TextProps } from 'react-native';
-
-import { semanticColors } from '@/design/colors';
+import { Platform, Text, type TextProps } from 'react-native';
+import { useExperience } from '@/providers/ExperienceProvider';
 import { typography } from '@/design/typography';
-
-type Variant =
-  | 'micro'
-  | 'eyebrow'
-  | 'metadata'
-  | 'bodySmall'
-  | 'body'
-  | 'bodyLarge'
-  | 'heading'
-  | 'title'
-  | 'display'
-  | 'displayXL'
-  | 'muted';
-
-type Props = PropsWithChildren<TextProps & { variant?: Variant }>;
-
-export function AppText({ variant = 'body', style, children, ...props }: Props) {
+type Variant = keyof typeof typography | 'eyebrow' | 'muted';
+export function AppText({ variant = 'body', style, ...props }: TextProps & { variant?: Variant }) {
+  const { colors } = useExperience();
+  const size =
+    variant === 'eyebrow' ? 11 : variant === 'muted' ? typography.body : typography[variant];
+  const editorial = ['display', 'displayXL', 'title'].includes(variant);
+  const secondary = ['metadata', 'muted', 'micro'].includes(variant);
   return (
-    <Text {...props} style={[styles.base, styles[variant], style]}>
-      {children}
-    </Text>
+    <Text
+      {...props}
+      style={[
+        {
+          color:
+            variant === 'eyebrow'
+              ? colors.accent.bronze
+              : secondary
+                ? colors.ink.secondary
+                : colors.ink.primary,
+          fontSize: size,
+          lineHeight: Math.round(size * (editorial ? 1.12 : 1.48)),
+          fontFamily: editorial
+            ? Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia, serif' })
+            : undefined,
+          fontWeight: variant === 'heading' || variant === 'eyebrow' ? '600' : '400',
+          letterSpacing: variant === 'eyebrow' ? 1.8 : editorial ? -1 : 0,
+          textTransform: variant === 'eyebrow' ? 'uppercase' : 'none',
+        },
+        style,
+      ]}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  base: { color: semanticColors.ink.primary },
-  micro: { fontSize: typography.micro, lineHeight: 13 },
-  eyebrow: {
-    color: semanticColors.accent.bronze,
-    fontSize: typography.metadata,
-    lineHeight: 15,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  metadata: { color: semanticColors.ink.secondary, fontSize: typography.metadata, lineHeight: 16 },
-  bodySmall: { fontSize: typography.bodySmall, lineHeight: 19 },
-  body: { fontSize: typography.body, lineHeight: 22 },
-  bodyLarge: { fontSize: typography.bodyLarge, lineHeight: 25, fontWeight: '600' },
-  heading: { fontSize: typography.heading, lineHeight: 28, fontWeight: '700', letterSpacing: -0.3 },
-  title: { fontSize: typography.title, lineHeight: 33, fontWeight: '700', letterSpacing: -0.7 },
-  display: { fontSize: typography.display, lineHeight: 41, fontWeight: '700', letterSpacing: -1.1 },
-  displayXL: { fontSize: typography.displayXL, lineHeight: 48, fontWeight: '700', letterSpacing: -1.4 },
-  muted: { color: semanticColors.ink.secondary, fontSize: typography.body, lineHeight: 22 },
-});

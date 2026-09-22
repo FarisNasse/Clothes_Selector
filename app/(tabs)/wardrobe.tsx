@@ -1,212 +1,232 @@
+import { useDeferredValue, useMemo, useState } from 'react';
+import { FlatList, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Link, router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
-
+import { router } from 'expo-router';
+import { Screen } from '@/components/Screen';
+import { PageHeading } from '@/components/navigation/PageHeading';
 import { GarmentTile } from '@/components/garment/GarmentTile';
+import { FilterSheet } from '@/components/wardrobe/FilterSheet';
 import { AppText } from '@/components/primitives/AppText';
+import { Button } from '@/components/primitives/Button';
 import { Chip } from '@/components/primitives/Chip';
 import { EmptyState } from '@/components/primitives/EmptyState';
-import { Screen } from '@/components/Screen';
-import { semanticColors } from '@/design/colors';
-import { radius } from '@/design/radii';
-import { space } from '@/design/spacing';
+import { IconButton } from '@/components/primitives/IconButton';
+import { Notice } from '@/components/primitives/Notice';
+import { Skeleton } from '@/components/primitives/Skeleton';
+import { layout } from '@/design/layout';
+import { activeFilterCount, defaultFilters, filterWardrobe } from '@/features/wardrobe/filter';
+import { useExperience } from '@/providers/ExperienceProvider';
+import { useCollection } from '@/providers/CollectionProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
 import type { GarmentCategory } from '@/types/domain';
-
-const filters: { label: string; value: GarmentCategory | 'all' }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'Tops', value: 'top' },
-  { label: 'Bottoms', value: 'bottom' },
-  { label: 'Outerwear', value: 'outerwear' },
-  { label: 'Shoes', value: 'footwear' },
-  { label: 'Accessories', value: 'accessory' },
+const categories: [GarmentCategory | 'all', string][] = [
+  ['all', 'All pieces'],
+  ['top', 'Tops'],
+  ['bottom', 'Bottoms'],
+  ['outerwear', 'Layers'],
+  ['footwear', 'Shoes'],
+  ['accessory', 'Accessories'],
+  ['suit', 'Suits'],
 ];
-
 export default function WardrobeScreen() {
-  const { garments, loading, error } = useWardrobe();
+  const { garments, loading, error, refresh } = useWardrobe();
+  const { favorites, toggleFavorite, error: collectionError } = useCollection();
+  const { colors: c, haptic } = useExperience();
   const { width } = useWindowDimensions();
-  const [filter, setFilter] = useState<GarmentCategory | 'all'>('all');
   const [query, setQuery] = useState('');
-
-  const visible = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return garments.filter((garment) => {
-      const matchesCategory = filter === 'all' || garment.category === filter;
-      const matchesQuery =
-        !normalized ||
-        [garment.name, garment.brand ?? '', garment.primaryColor, garment.subcategory, ...garment.styleTags]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalized);
-      return matchesCategory && matchesQuery;
-    });
-  }, [filter, garments, query]);
-
-  const columns = width >= 900 ? 4 : width < 360 ? 2 : 3;
-  const tileWidth: `${number}%` = columns === 4 ? '23.5%' : columns === 2 ? '48.5%' : '31.5%';
-
+  const deferredQuery = useDeferredValue(query);
+  const [focused, setFocused] = useState(false);
+  const [filters, setFilters] = useState(defaultFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const visible = useMemo(
+    () => filterWardrobe(garments, deferredQuery, filters, favorites),
+    [garments, deferredQuery, filters, favorites],
+  );
+  const colors = useMemo(
+    () =>
+      [
+        ...new Set(
+          garments
+            .flatMap((item) => [item.primaryColor, ...item.secondaryColors])
+            .map((color) => color.toLowerCase()),
+        ),
+      ].sort(),
+    [garments],
+  );
+  const columns = width >= 1200 ? 5 : width >= 900 ? 4 : width >= 700 ? 3 : 2;
+  const padding = width < 380 ? 16 : width < 700 ? 24 : 40;
+  const tileWidth = (Math.min(width, layout.maxWidth) - padding * 2 - 14 * (columns - 1)) / columns;
+  const extraFilters = activeFilterCount(filters);
+  const clear = () => {
+    setQuery('');
+    setFilters(defaultFilters);
+  };
   return (
-    <Screen maxWidth={1180}>
-      <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <AppText variant="eyebrow">Wardrobe</AppText>
-          <AppText variant="displayXL">Everything you own, visually.</AppText>
-          <AppText variant="muted" style={styles.headerDetail}>
-            Browse the closet first. Metadata stays quiet until you need it.
-          </AppText>
-        </View>
-        <Link href="/garment/add" asChild>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add garment"
-            style={({ pressed }) => [styles.addButton, pressed && styles.addPressed]}
-          >
-            <Ionicons name="add" color={semanticColors.ink.inverse} size={27} />
-          </Pressable>
-        </Link>
-      </View>
-
-      <View style={styles.toolbar}>
-        <View style={styles.search}>
-          <Ionicons name="search" size={18} color={semanticColors.ink.tertiary} />
-          <TextInput
-            accessibilityLabel="Search wardrobe"
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search your wardrobe"
-            placeholderTextColor={semanticColors.ink.tertiary}
-            style={styles.searchInput}
-            returnKeyType="search"
-          />
-          {query ? (
-            <Pressable accessibilityLabel="Clear wardrobe search" onPress={() => setQuery('')} hitSlop={10}>
-              <Ionicons name="close-circle" size={18} color={semanticColors.ink.tertiary} />
-            </Pressable>
-          ) : null}
-        </View>
-        <View style={styles.countBadge}>
-          <AppText variant="metadata" style={styles.countText}>{visible.length} pieces</AppText>
-        </View>
-      </View>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRail}>
-        {filters.map((item) => (
-          <Chip
-            key={item.value}
-            label={item.label}
-            selected={filter === item.value}
-            onPress={() => setFilter(item.value)}
-          />
-        ))}
-      </ScrollView>
-
-      {loading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator color={semanticColors.accent.forest} />
-          <AppText variant="metadata">Opening your wardrobe…</AppText>
-        </View>
-      ) : null}
-
-      {error ? (
-        <View style={styles.errorWrap}>
-          <Ionicons name="alert-circle-outline" size={18} color={semanticColors.feedback.negative} />
-          <AppText variant="bodySmall" style={styles.errorText}>{error}</AppText>
-        </View>
-      ) : null}
-
-      {!loading && visible.length ? (
-        <View style={styles.grid}>
-          {visible.map((garment) => (
-            <GarmentTile
-              garment={garment}
-              width={tileWidth}
-              key={garment.id}
-              onPress={() => router.push({ pathname: '/garment/[id]', params: { id: garment.id } })}
+    <Screen scroll={false} padded={false}>
+      <FlatList
+        key={columns}
+        data={visible}
+        numColumns={columns}
+        keyExtractor={(item) => item.id}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={5}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        columnWrapperStyle={{ gap: 14 }}
+        contentContainerStyle={{ paddingHorizontal: padding, paddingBottom: 28 }}
+        ListHeaderComponent={
+          <View>
+            <PageHeading
+              eyebrow="Your wardrobe"
+              title={'Good pieces.\nEndless possibilities.'}
+              action={
+                <IconButton
+                  label="Add garment"
+                  icon="add"
+                  onPress={() => router.push('/garment/add')}
+                />
+              }
             />
-          ))}
-        </View>
-      ) : null}
-
-      {!loading && !visible.length ? (
-        <EmptyState
-          title={garments.length ? 'Nothing matches that search.' : 'Your wardrobe is ready for its first piece.'}
-          detail={
-            garments.length
-              ? 'Try another category, color, garment type, or brand.'
-              : 'Photograph a garment and Clothes Selector will turn it into a structured, styleable wardrobe item.'
-          }
-          actionLabel={garments.length ? 'Clear filters' : 'Add a garment'}
-          onAction={() => {
-            if (garments.length) {
-              setFilter('all');
-              setQuery('');
-            } else {
-              router.push('/garment/add');
-            }
-          }}
-        />
-      ) : null}
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              <View
+                style={{
+                  flex: 1,
+                  minHeight: 52,
+                  paddingLeft: 16,
+                  paddingRight: 3,
+                  borderRadius: 26,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: focused ? c.accent.forest : c.border.subtle,
+                  backgroundColor: c.canvas.elevated,
+                  gap: 10,
+                }}
+              >
+                <Ionicons name="search-outline" color={c.ink.secondary} size={19} />
+                <TextInput
+                  accessibilityLabel="Search wardrobe"
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Try “black dinner”"
+                  placeholderTextColor={c.ink.tertiary}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  returnKeyType="search"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    color: c.ink.primary,
+                    minHeight: 48,
+                    fontSize: 15,
+                  }}
+                />
+                {query ? (
+                  <IconButton label="Clear search" icon="close" onPress={() => setQuery('')} />
+                ) : null}
+              </View>
+              <IconButton
+                label={'Filters' + (extraFilters ? ', ' + extraFilters + ' active' : '')}
+                icon="options-outline"
+                selected={extraFilters > 0}
+                onPress={() => setFiltersOpen(true)}
+              />
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingVertical: 18 }}
+            >
+              {categories.map(([category, label]) => (
+                <Chip
+                  key={category}
+                  label={label}
+                  selected={filters.category === category}
+                  onPress={() => setFilters((current) => ({ ...current, category }))}
+                />
+              ))}
+            </ScrollView>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingBottom: 18,
+              }}
+            >
+              <AppText variant="eyebrow">
+                {visible.length} {visible.length === 1 ? 'piece' : 'pieces'}
+                {extraFilters ? ' / ' + extraFilters + ' filters' : ''}
+              </AppText>
+              <Button
+                label="Add a piece"
+                icon="add"
+                variant="quiet"
+                onPress={() => router.push('/garment/add')}
+              />
+            </View>
+            {collectionError ? <Notice message={collectionError} tone="error" /> : null}
+            {error ? (
+              <Notice
+                message="We could not open your wardrobe."
+                tone="error"
+                action="Try again"
+                onAction={refresh}
+              />
+            ) : null}
+          </View>
+        }
+        renderItem={({ item }) => (
+          <GarmentTile
+            garment={item}
+            width={tileWidth}
+            favorite={favorites.includes(item.id)}
+            onFavorite={() => {
+              if (toggleFavorite(item.id)) haptic();
+            }}
+            onPress={() => router.push({ pathname: '/garment/[id]', params: { id: item.id } })}
+          />
+        )}
+        ListEmptyComponent={
+          loading ? (
+            <WardrobeSkeleton columns={columns} tileWidth={tileWidth} />
+          ) : error ? null : (
+            <EmptyState
+              title={garments.length ? 'Nothing here. Yet.' : 'Your wardrobe starts here.'}
+              detail={
+                garments.length
+                  ? query
+                    ? 'No pieces match “' + query + '” with these filters.'
+                    : 'Try a different filter to find your pieces.'
+                  : 'Start with a favorite top, a pair of trousers, and your go-to shoes.'
+              }
+              actionLabel={garments.length ? 'Clear filters' : 'Add your first piece'}
+              onAction={() => {
+                if (garments.length) clear();
+                else router.push('/garment/add');
+              }}
+            />
+          )
+        }
+      />
+      <FilterSheet
+        visible={filtersOpen}
+        filters={filters}
+        colors={colors}
+        onApply={setFilters}
+        onClose={() => setFiltersOpen(false)}
+      />
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    paddingTop: space.lg,
-    flexDirection: 'row',
-    gap: space.xl,
-    alignItems: 'flex-start',
-  },
-  headerCopy: { flex: 1, gap: space.sm },
-  headerDetail: { maxWidth: 620 },
-  addButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: semanticColors.accent.forestDeep,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addPressed: { opacity: 0.78, transform: [{ scale: 0.97 }] },
-  toolbar: {
-    marginTop: space.section,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-  },
-  search: {
-    flex: 1,
-    minHeight: 50,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.lg,
-    backgroundColor: semanticColors.canvas.elevated,
-    borderWidth: 1,
-    borderColor: semanticColors.border.subtle,
-  },
-  searchInput: { flex: 1, color: semanticColors.ink.primary, fontSize: 15, paddingVertical: 0 },
-  countBadge: {
-    minHeight: 42,
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: semanticColors.canvas.sunken,
-    paddingHorizontal: space.lg,
-  },
-  countText: { fontWeight: '700' },
-  filterRail: { gap: space.sm, paddingTop: space.lg, paddingBottom: space.xl, paddingRight: space.xxl },
-  loaderWrap: { paddingVertical: space.section, alignItems: 'center', gap: space.md },
-  errorWrap: {
-    marginBottom: space.lg,
-    padding: space.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    borderRadius: radius.md,
-    backgroundColor: '#F5E6E3',
-  },
-  errorText: { flex: 1, color: semanticColors.feedback.negative },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-});
+function WardrobeSkeleton({ columns, tileWidth }: { columns: number; tileWidth: number }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 14 }}>
+      {Array.from({ length: columns }, (_, index) => (
+        <Skeleton key={index} width={tileWidth} height={tileWidth * 1.3} />
+      ))}
+    </View>
+  );
+}

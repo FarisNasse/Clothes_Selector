@@ -119,6 +119,8 @@ This is an **initial production foundation / proposal beta patch**, not a store-
 
 ## Documentation
 
+- `docs/REDESIGN.md` — redesign setup, interaction behavior, validation, and remaining device checks
+
 - `docs/PRODUCT_PROPOSAL.md` — concise stakeholder/investor/product proposal
 - `docs/ARCHITECTURE.md` — system boundaries and data flow
 - `docs/ROADMAP.md` — implementation sequence and ship gates

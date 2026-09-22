@@ -1,0 +1,308 @@
+import { router } from 'expo-router';
+import { useMemo, useRef, useState } from 'react';
+import { ScrollView, View } from 'react-native';
+import { AppText } from '@/components/primitives/AppText';
+import { Button } from '@/components/primitives/Button';
+import { Chip } from '@/components/primitives/Chip';
+import { EmptyState } from '@/components/primitives/EmptyState';
+import { Notice } from '@/components/primitives/Notice';
+import { BottomSheet } from '@/components/sheets/BottomSheet';
+import { GarmentImage } from '@/components/garment/GarmentImage';
+import { RecommendationHero } from '@/components/outfit/RecommendationHero';
+import { ContextSheet } from './ContextSheet';
+import { SwapGarmentSheet } from './SwapGarmentSheet';
+import { defaultWeather, lookTitles, occasionLabels } from '@/features/styling/context';
+import { missingPieces } from '@/features/styling/session';
+import { useStylingSession } from '@/features/styling/useStylingSession';
+import type { SavedLook } from '@/features/collections/storage';
+import { useCollection } from '@/providers/CollectionProvider';
+import { useExperience } from '@/providers/ExperienceProvider';
+import { useWardrobe } from '@/providers/WardrobeProvider';
+import { useStyleProfile } from '@/providers/StyleProfileProvider';
+import { useSession } from '@/providers/SessionProvider';
+import type { Occasion, WeatherContext } from '@/types/domain';
+
+export function StylingStudio({
+  anchorId,
+  initialLook,
+}: {
+  anchorId?: string;
+  initialLook?: SavedLook;
+}) {
+  const { garments, recordWear } = useWardrobe();
+  const { profile } = useStyleProfile();
+  const { isDemo } = useSession();
+  const { looks, toggleLook, error: collectionError } = useCollection();
+  const { haptic } = useExperience();
+  const [occasion, setOccasion] = useState<Occasion>(initialLook?.occasion ?? 'everyday');
+  const [weather, setWeather] = useState<WeatherContext>(initialLook?.weather ?? defaultWeather);
+  const [now] = useState(() => new Date());
+  const context = useMemo(
+    () => ({ occasion, weather, styleProfile: profile, now }),
+    [occasion, weather, profile, now],
+  );
+  const styling = useStylingSession(garments, context, anchorId, initialLook?.garmentIds);
+  const { state, dispatch, recommendation, selected, swaps, canChange, another, toggleLock } =
+    styling;
+  const [contextOpen, setContextOpen] = useState(false);
+  const [explanationOpen, setExplanationOpen] = useState(false);
+  const [swapping, setSwapping] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const recordingRef = useRef(false);
+  const [worn, setWorn] = useState<string[]>([]);
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  function resetContext(nextOccasion: Occasion, nextWeather: WeatherContext) {
+    setOccasion(nextOccasion);
+    setWeather(nextWeather);
+    styling.reset();
+    setMessage(null);
+    setSwapping(false);
+  }
+  function closePiece() {
+    dispatch({ type: 'select', id: null });
+    setSwapping(false);
+  }
+  async function wear() {
+    if (!recommendation || recordingRef.current || worn.includes(recommendation.id)) return;
+    const accepted = recommendation;
+    recordingRef.current = true;
+    setRecording(true);
+    setMessage(null);
+    dispatch({ type: 'keep', ids: accepted.garments.map((item) => item.id) });
+    try {
+      await recordWear(accepted, occasion, weather);
+      setWorn((current) => [...current, accepted.id]);
+      haptic('success');
+      setMessage({
+        text: isDemo
+          ? 'Added to your demo rotation for this session.'
+          : 'Added to your rotation. Have a good day.',
+        error: false,
+      });
+    } catch {
+      setMessage({
+        text: 'We could not record this look. Your outfit is still here; please try again.',
+        error: true,
+      });
+    } finally {
+      recordingRef.current = false;
+      setRecording(false);
+    }
+  }
+  const label = occasionLabels.find((item) => item.key === occasion)?.label ?? 'Everyday';
+  const anchor = garments.find((item) => item.id === anchorId);
+  return (
+    <View style={{ gap: 24 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 4,
+        }}
+      >
+        <AppText variant="eyebrow">
+          {anchor ? 'Build around your piece' : 'What is the occasion?'}
+        </AppText>
+        <Button
+          label={
+            weather.temperatureF + '°F · ' + (weather.raining ? 'Rain' : 'Dry') + ' · Set weather'
+          }
+          variant="quiet"
+          icon={weather.raining ? 'rainy-outline' : 'sunny-outline'}
+          onPress={() => setContextOpen(true)}
+          disabled={recording}
+        />
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+      >
+        {occasionLabels.map((item) => (
+          <Chip
+            key={item.key}
+            label={item.label}
+            selected={occasion === item.key}
+            onPress={recording ? undefined : () => resetContext(item.key, weather)}
+          />
+        ))}
+      </ScrollView>
+      {recommendation ? (
+        <RecommendationHero
+          recommendation={recommendation}
+          title={anchor ? 'One piece.\nNew possibilities.' : lookTitles[occasion]}
+          contextLabel={label + ' / your wardrobe'}
+          lockedIds={state.lockedIds}
+          wearLoading={recording}
+          wearSuccess={worn.includes(recommendation.id)}
+          onWear={wear}
+          canChange={canChange}
+          onAnother={() => {
+            another();
+            setMessage(null);
+            haptic();
+          }}
+          onPrevious={() => {
+            another(-1);
+            setMessage(null);
+            haptic();
+          }}
+          onGarmentPress={(item) => {
+            if (!recording) dispatch({ type: 'select', id: item.id });
+          }}
+          onExplain={() => setExplanationOpen(true)}
+          countLabel={
+            styling.recommendations.some((item) => item.id === recommendation.id)
+              ? String(
+                  styling.recommendations.findIndex((item) => item.id === recommendation.id) + 1,
+                ).padStart(2, '0') +
+                ' / ' +
+                String(styling.recommendations.length).padStart(2, '0')
+              : 'YOUR EDIT'
+          }
+          saved={looks.some((item) => item.id === recommendation.id)}
+          onSave={() => {
+            const wasSaved = looks.some((item) => item.id === recommendation.id);
+            if (toggleLook(recommendation, occasion, weather)) {
+              haptic('success');
+              setMessage({
+                text: wasSaved
+                  ? 'Removed from saved looks.'
+                  : 'Saved on this device. Find it in You → Saved looks.',
+                error: false,
+              });
+            }
+          }}
+        />
+      ) : (
+        <EmptyState
+          title={
+            missingPieces(garments) ? 'A few pieces away.' : 'Let’s try a different direction.'
+          }
+          detail={
+            missingPieces(garments)
+              ? 'Add ' + missingPieces(garments) + ' to build a complete look.'
+              : 'These pieces do not make a complete match for the current occasion and weather. Try another occasion, change the weather, or release your locks.'
+          }
+          actionLabel={missingPieces(garments) ? 'Add a piece' : 'Reset this look'}
+          onAction={() => {
+            if (missingPieces(garments)) router.push('/garment/add');
+            else resetContext('everyday', defaultWeather);
+          }}
+        />
+      )}
+      {state.undoIds ? (
+        <Notice
+          message="A fresh way to wear it."
+          action="Undo swap"
+          onAction={() => {
+            dispatch({ type: 'undo' });
+            haptic();
+          }}
+        />
+      ) : null}
+      {message ? (
+        <Notice message={message.text} tone={message.error ? 'error' : 'success'} />
+      ) : null}
+      {collectionError ? <Notice message={collectionError} tone="error" /> : null}
+      <ContextSheet
+        visible={contextOpen}
+        weather={weather}
+        onApply={(next) => resetContext(occasion, next)}
+        onClose={() => setContextOpen(false)}
+      />
+      <BottomSheet
+        visible={explanationOpen}
+        title="Why this works."
+        subtitle="A little thought behind the look."
+        onClose={() => setExplanationOpen(false)}
+      >
+        <AppText variant="bodyLarge">{recommendation?.explanation}</AppText>
+        <AppText variant="muted">
+          Chosen for {label.toLowerCase()}, with {weather.raining ? 'rain' : 'dry conditions'} and{' '}
+          {weather.temperatureF}°F in mind.
+        </AppText>
+        <AppText variant="metadata">
+          Your chosen fits and aesthetics guide the combination. Wear history helps bring overlooked
+          pieces back into rotation.
+        </AppText>
+      </BottomSheet>
+      {selected && !swapping ? (
+        <BottomSheet
+          visible
+          title={selected.name}
+          subtitle={selected.primaryColor + ' · ' + selected.subcategory}
+          onClose={closePiece}
+        >
+          <View style={{ alignItems: 'center' }}>
+            <GarmentImage
+              garment={selected}
+              variant="thumbnail"
+              style={{ width: 130, height: 160 }}
+            />
+          </View>
+          <Button
+            label={state.lockedIds.includes(selected.id) ? 'Unlock this piece' : 'Keep this piece'}
+            icon={
+              state.lockedIds.includes(selected.id) ? 'lock-open-outline' : 'lock-closed-outline'
+            }
+            disabled={selected.id === anchorId}
+            onPress={() => {
+              toggleLock(selected.id);
+              haptic('impact');
+            }}
+          />
+          {selected.id === anchorId ? (
+            <AppText variant="metadata">This is the starting piece for your look.</AppText>
+          ) : null}
+          <Button
+            label="Swap this piece"
+            icon="swap-horizontal"
+            variant="secondary"
+            disabled={state.lockedIds.includes(selected.id)}
+            onPress={() => setSwapping(true)}
+          />
+          <Button
+            label="View garment"
+            variant="quiet"
+            icon="arrow-forward-outline"
+            onPress={() => {
+              closePiece();
+              router.push({ pathname: '/garment/[id]', params: { id: selected.id } });
+            }}
+          />
+          {selected.id !== anchorId ? (
+            <Button
+              label="Style around this piece"
+              variant="quiet"
+              onPress={() => {
+                closePiece();
+                router.push({ pathname: '/garment/[id]', params: { id: selected.id, style: '1' } });
+              }}
+            />
+          ) : null}
+        </BottomSheet>
+      ) : null}
+      {selected && swapping && recommendation ? (
+        <SwapGarmentSheet
+          key={selected.id}
+          garment={selected}
+          options={swaps}
+          onClose={closePiece}
+          onApply={(outfit) => {
+            dispatch({
+              type: 'swap',
+              ids: outfit.garments.map((item) => item.id),
+              previous: recommendation.garments.map((item) => item.id),
+            });
+            setSwapping(false);
+            setMessage(null);
+            haptic('impact');
+          }}
+        />
+      ) : null}
+    </View>
+  );
+}

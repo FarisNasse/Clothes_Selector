@@ -26,16 +26,26 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    void supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    let active = true;
+    void supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (active) setLoading(false);
+      });
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
     });
 
-    return () => data.subscription.unsubscribe();
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
 
   const value = useMemo<SessionContextValue>(
@@ -54,7 +64,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
         return error?.message ?? null;
       },
       signOut: async () => {
-        if (supabase) await supabase.auth.signOut();
+        if (supabase) {
+          const { error } = await supabase.auth.signOut();
+          if (error) throw error;
+        }
       },
     }),
     [loading, session],

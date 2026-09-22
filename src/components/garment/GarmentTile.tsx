@@ -1,39 +1,53 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-
-import { GarmentImage } from '@/components/garment/GarmentImage';
+import { memo } from 'react';
+import { View, type DimensionValue } from 'react-native';
+import { GarmentImage } from './GarmentImage';
 import { AppText } from '@/components/primitives/AppText';
-import { semanticColors } from '@/design/colors';
-import { space } from '@/design/spacing';
+import { IconButton } from '@/components/primitives/IconButton';
+import { AnimatedPressable } from '@/components/motion/AnimatedPressable';
 import type { Garment } from '@/types/domain';
-
 type Props = {
   garment: Garment;
-  onPress?: () => void;
-  width?: `${number}%` | number;
+  width?: DimensionValue;
+  onPress: () => void;
+  favorite?: boolean;
+  onFavorite?: () => void;
 };
-
-export function GarmentTile({ garment, onPress, width = '31.5%' }: Props) {
+export const GarmentTile = memo(function GarmentTileContent({
+  garment,
+  width = '100%',
+  onPress,
+  favorite = false,
+  onFavorite,
+}: Props) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${garment.name}. ${garment.brand ?? 'Unbranded'}. Worn ${garment.wearCount} times. Double tap to view.`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.root, { width }, pressed && styles.pressed]}
-    >
-      <GarmentImage garment={garment} variant="grid" />
-      <View style={styles.copy}>
-        <AppText variant="bodySmall" style={styles.brand} numberOfLines={1}>
-          {garment.brand ?? 'Unbranded'}
-        </AppText>
-        <AppText variant="metadata" numberOfLines={1}>{garment.name}</AppText>
-      </View>
-    </Pressable>
+    <View style={{ width, gap: 10, marginBottom: 24 }}>
+      <AnimatedPressable
+        accessibilityRole="button"
+        accessibilityLabel={'View ' + garment.name}
+        feedback
+        onPress={onPress}
+        style={{ borderRadius: 20 }}
+      >
+        <GarmentImage garment={garment} variant="grid" />
+        <View style={{ gap: 3, paddingTop: 12, paddingHorizontal: 2 }}>
+          <AppText variant="bodySmall" numberOfLines={2} style={{ fontWeight: '500' }}>
+            {garment.name}
+          </AppText>
+          <AppText variant="metadata" numberOfLines={1}>
+            {garment.brand ?? garment.subcategory}
+          </AppText>
+        </View>
+      </AnimatedPressable>
+      {onFavorite ? (
+        <View style={{ position: 'absolute', right: 6, top: 6 }}>
+          <IconButton
+            icon={favorite ? 'heart' : 'heart-outline'}
+            label={(favorite ? 'Unfavorite ' : 'Favorite ') + garment.name}
+            selected={favorite}
+            onPress={onFavorite}
+          />
+        </View>
+      ) : null}
+    </View>
   );
-}
-
-const styles = StyleSheet.create({
-  root: { gap: space.sm, marginBottom: space.xl },
-  pressed: { opacity: 0.78 },
-  copy: { gap: 1, paddingHorizontal: 2 },
-  brand: { color: semanticColors.ink.primary, fontWeight: '700' },
 });

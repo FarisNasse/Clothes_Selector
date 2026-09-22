@@ -4,22 +4,10 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "src/*"
-      ]
+      "@/*": ["./src/*"]
     },
-    "types": [
-      "react",
-      "react-native"
-    ]
+    "types": ["node", "react", "react-native"]
   },
-  "include": [
-    "app",
-    "src",
-    "tests",
-    "expo-env.d.ts",
-    ".expo/types/**/*.ts"
-  ]
+  "include": ["app", "src", "tests", "expo-env.d.ts", ".expo/types/**/*.ts"]
 }

@@ -41,15 +41,17 @@ async function withSignedImages(garments: Garment[]): Promise<Garment[]> {
   if (!supabase || env.demoMode) return garments;
 
   const now = Date.now();
-  const pathsToSign = [...new Set(
-    garments
-      .map((garment) => garment.storagePath)
-      .filter((path): path is string => Boolean(path))
-      .filter((path) => {
-        const cached = signedUrlCache.get(path);
-        return !cached || cached.expiresAt <= now;
-      }),
-  )];
+  const pathsToSign = [
+    ...new Set(
+      garments
+        .map((garment) => garment.storagePath)
+        .filter((path): path is string => Boolean(path))
+        .filter((path) => {
+          const cached = signedUrlCache.get(path);
+          return !cached || cached.expiresAt <= now;
+        }),
+    ),
+  ];
 
   if (pathsToSign.length > 0) {
     const { data, error } = await supabase.storage
@@ -128,10 +130,15 @@ export async function createGarment(userId: string, draft: GarmentDraft): Promis
     .single();
   if (error) throw error;
   const [garment] = await withSignedImages([rowToGarment(data as Record<string, unknown>)]);
+  if (!garment) throw new Error('The saved garment was not returned.');
   return garment;
 }
 
-export async function updateGarment(userId: string, garmentId: string, draft: GarmentDraft): Promise<Garment> {
+export async function updateGarment(
+  userId: string,
+  garmentId: string,
+  draft: GarmentDraft,
+): Promise<Garment> {
   if (env.demoMode) {
     return {
       ...draft,
@@ -152,6 +159,7 @@ export async function updateGarment(userId: string, garmentId: string, draft: Ga
     .single();
   if (error) throw error;
   const [garment] = await withSignedImages([rowToGarment(data as Record<string, unknown>)]);
+  if (!garment) throw new Error('The updated garment was not returned.');
   return garment;
 }
 
@@ -160,11 +168,17 @@ export async function deleteGarment(userId: string, garment: Garment): Promise<v
   if (!supabase) throw new Error('Supabase is not configured.');
 
   // Remove the database row first. If that fails, the image remains recoverable.
-  const { error } = await supabase.from('garments').delete().eq('id', garment.id).eq('user_id', userId);
+  const { error } = await supabase
+    .from('garments')
+    .delete()
+    .eq('id', garment.id)
+    .eq('user_id', userId);
   if (error) throw error;
 
   if (garment.storagePath) {
-    const { error: storageError } = await supabase.storage.from(IMAGE_BUCKET).remove([garment.storagePath]);
+    const { error: storageError } = await supabase.storage
+      .from(IMAGE_BUCKET)
+      .remove([garment.storagePath]);
     if (!storageError) signedUrlCache.delete(garment.storagePath);
   }
 }

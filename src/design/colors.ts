@@ -5,7 +5,7 @@ export const palette = {
   stone: '#DDD7CD',
   graphite: '#171916',
   slate: '#62665F',
-  ash: '#91958E',
+  ash: '#73776E',
   forest: '#30473B',
   forestDeep: '#20362C',
   forestMist: '#E2E8E3',
@@ -51,3 +51,24 @@ export const semanticColors = {
     negative: palette.danger,
   },
 } as const;
+
+export type Colors = {
+  [Section in keyof typeof semanticColors]: {
+    [Token in keyof (typeof semanticColors)[Section]]: string;
+  };
+};
+export const darkColors: Colors = {
+  canvas: { default: '#171C19', elevated: '#232B26', sunken: '#2C342E' },
+  ink: { primary: '#F3EFE5', secondary: '#C0C5BA', tertiary: '#A4AC9F', inverse: '#FBF9F5' },
+  border: { subtle: '#39433A', strong: '#566354' },
+  accent: {
+    forest: '#B0C8AA',
+    forestDeep: '#304B3D',
+    forestMist: '#304137',
+    navy: '#AEBFD4',
+    burgundy: '#D8AFAE',
+    bronze: '#C9AA81',
+    bronzeMist: '#3C352B',
+  },
+  feedback: { positive: '#A6D3B8', caution: '#E0BB7F', negative: '#F0AAA0' },
+};

@@ -63,6 +63,7 @@ export type GenerateOutfitInput = {
   weather: WeatherContext;
   styleProfile: StyleProfile;
   lockedGarmentId?: string;
+  lockedGarmentIds?: string[];
   limit?: number;
   now?: Date;
 };
@@ -128,11 +129,17 @@ function preferenceScore(garments: Garment[], profile: StyleProfile) {
 }
 
 function silhouetteScore(garments: Garment[]) {
-  const fits = garments.filter((garment) => garment.category !== 'footwear').map((garment) => garment.fit);
+  const fits = garments
+    .filter((garment) => garment.category !== 'footwear')
+    .map((garment) => garment.fit);
   if (fits.length < 2) return 0.9;
 
   const conflicting =
-    fits.includes('slim') && fits.includes('oversized') ? 0.58 : fits.includes('slim') && fits.includes('relaxed') ? 0.78 : 0.94;
+    fits.includes('slim') && fits.includes('oversized')
+      ? 0.58
+      : fits.includes('slim') && fits.includes('relaxed')
+        ? 0.78
+        : 0.94;
   return conflicting;
 }
 
@@ -169,7 +176,9 @@ function weatherScore(garments: Garment[], weather: WeatherContext) {
 
 function textureScore(garments: Garment[]) {
   const textured = garments.filter((garment) =>
-    garment.materials.some((material) => ['suede', 'wool', 'linen', 'silk', 'denim'].includes(material.toLowerCase())),
+    garment.materials.some((material) =>
+      ['suede', 'wool', 'linen', 'silk', 'denim'].includes(material.toLowerCase()),
+    ),
   ).length;
   if (textured === 0) return 0.75;
   if (textured <= 2) return 1;
@@ -197,7 +206,9 @@ function isHardCompatible(candidate: Candidate, occasion: Occasion, weather: Wea
   }
 
   if (weather.temperatureF >= 82) {
-    const tooHeavy = candidate.some((garment) => garment.category === 'outerwear' && garment.warmth >= 7);
+    const tooHeavy = candidate.some(
+      (garment) => garment.category === 'outerwear' && garment.warmth >= 7,
+    );
     if (tooHeavy) return false;
   }
 
@@ -237,37 +248,124 @@ function explain(garments: Garment[], breakdown: OutfitScoreBreakdown, occasion:
 
   const reasons: string[] = [];
   if (top && bottom && breakdown.colorHarmony >= 0.88) {
-    reasons.push(`${top.primaryColor} and ${bottom.primaryColor} create a controlled, versatile palette`);
+    reasons.push(
+      `${top.primaryColor} and ${bottom.primaryColor} create a controlled, versatile palette`,
+    );
   }
   if (footwear && breakdown.textureCompatibility >= 0.9) {
-    reasons.push(`${footwear.name.toLowerCase()} adds useful texture without disrupting the silhouette`);
+    reasons.push(
+      `${footwear.name.toLowerCase()} adds useful texture without disrupting the silhouette`,
+    );
   }
   if (breakdown.wardrobeRotation >= 0.75) {
     reasons.push('the combination brings less-used pieces back into rotation');
   }
 
-  const lead = reasons.length > 0 ? reasons.slice(0, 2).join(', while ') : 'the pieces share a consistent level of formality';
-  return `${lead}. The overall balance is tuned for ${occasion.replace('_', ' ')} rather than generic styling.`;
+  const lead =
+    reasons.length > 0
+      ? reasons.slice(0, 2).join(', while ')
+      : 'the pieces share a consistent level of formality';
+  return `${lead}. The overall balance is tuned for ${occasion.replace('_', ' ')} with pieces you already own.`;
 }
 
-function buildCandidates(wardrobe: Garment[], lockedGarmentId?: string) {
-  const tops = wardrobe.filter((garment) => garment.category === 'top');
-  const bottoms = wardrobe.filter((garment) => garment.category === 'bottom');
-  const shoes = wardrobe.filter((garment) => garment.category === 'footwear');
-  const outerwear = wardrobe.filter((garment) => garment.category === 'outerwear');
-  const candidates: Candidate[] = [];
+type Slot = (Garment | undefined)[];
+const MAX_CANDIDATES = 8000;
 
-  for (const top of tops) {
-    for (const bottom of bottoms) {
-      for (const shoe of shoes) {
-        candidates.push([top, bottom, shoe]);
-        for (const layer of outerwear) candidates.push([layer, top, bottom, shoe]);
-      }
+/** Bound work for large closets; walk each product with a deterministic coprime stride. */
+function* combinations(slots: Slot[], budget: number): Generator<Garment[]> {
+  const total = slots.reduce((count, slot) => count * slot.length, 1);
+  if (!total) return;
+  const count = Math.min(total, budget);
+  let step = total <= budget ? 1 : Math.max(1, Math.floor(total * 0.61803398875));
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  while (gcd(step, total) !== 1) step += 1;
+  let ordinal = 0;
+  for (let sample = 0; sample < count; sample += 1) {
+    let remainder = ordinal;
+    const candidate: Garment[] = [];
+    for (const slot of slots) {
+      const item = slot[remainder % slot.length];
+      remainder = Math.floor(remainder / slot.length);
+      if (item) candidate.push(item);
     }
+    yield candidate;
+    ordinal = (ordinal + step) % total;
   }
+}
 
-  if (!lockedGarmentId) return candidates;
-  return candidates.filter((candidate) => candidate.some((garment) => garment.id === lockedGarmentId));
+function* buildCandidates(wardrobe: Garment[], lockedIds: string[]): Generator<Garment[]> {
+  const unique = [...new Map(wardrobe.map((item) => [item.id, item])).values()];
+  const locks = lockedIds.map((id) => unique.find((item) => item.id === id));
+  if (locks.some((item) => !item)) return;
+  if (new Set(locks.map((item) => item?.category)).size !== locks.length) return;
+  const pool = (category: Garment['category']): Garment[] => {
+    const locked = locks.find((item) => item?.category === category);
+    return locked ? [locked] : unique.filter((item) => item.category === category);
+  };
+  const optional = (category: Garment['category']): Slot =>
+    locks.some((item) => item?.category === category)
+      ? pool(category)
+      : [undefined, ...pool(category)];
+  const regular: Slot[] = [
+    optional('outerwear'),
+    pool('top'),
+    pool('bottom'),
+    pool('footwear'),
+    optional('accessory'),
+  ];
+  const suited: Slot[] = [pool('suit'), pool('top'), pool('footwear'), optional('accessory')];
+  const structures = [
+    ...(!locks.some((item) => item?.category === 'suit') ? [regular] : []),
+    ...(!locks.some((item) => item?.category === 'bottom' || item?.category === 'outerwear')
+      ? [suited]
+      : []),
+  ].filter((slots) => slots.every((slot) => slot.length > 0));
+  for (const slots of structures) {
+    yield* combinations(slots, Math.floor(MAX_CANDIDATES / structures.length));
+  }
+}
+
+export type OutfitContext = Pick<
+  GenerateOutfitInput,
+  'occasion' | 'weather' | 'styleProfile' | 'now'
+>;
+export function outfitKey(ids: string[]): string {
+  return [...ids].sort().join(':');
+}
+
+/** Used by both generation and swaps, so an edited look gets fresh scores and reasoning. */
+export function evaluateOutfit(
+  garments: Garment[],
+  context: OutfitContext,
+): OutfitRecommendation | null {
+  const categories = new Set(garments.map((item) => item.category));
+  const complete =
+    categories.has('top') &&
+    categories.has('footwear') &&
+    (categories.has('bottom') || categories.has('suit'));
+  if (
+    !complete ||
+    categories.size !== garments.length ||
+    new Set(garments.map((item) => item.id)).size !== garments.length
+  )
+    return null;
+  if (categories.has('suit') && (categories.has('bottom') || categories.has('outerwear')))
+    return null;
+  if (!isHardCompatible(garments, context.occasion, context.weather)) return null;
+  const { score, breakdown } = scoreCandidate(
+    garments,
+    context.occasion,
+    context.weather,
+    context.styleProfile,
+    context.now ?? new Date(),
+  );
+  return {
+    id: outfitKey(garments.map((item) => item.id)),
+    garments,
+    score,
+    breakdown,
+    explanation: explain(garments, breakdown, context.occasion),
+  };
 }
 
 export function generateOutfits({
@@ -276,33 +374,36 @@ export function generateOutfits({
   weather,
   styleProfile,
   lockedGarmentId,
+  lockedGarmentIds = [],
   limit = 3,
   now = new Date(),
 }: GenerateOutfitInput): OutfitRecommendation[] {
-  return buildCandidates(wardrobe, lockedGarmentId)
-    .filter((candidate) => isHardCompatible(candidate, occasion, weather))
-    .map((garments) => {
-      const { score, breakdown } = scoreCandidate(garments, occasion, weather, styleProfile, now);
-      return {
-        id: garments.map((garment) => garment.id).join(':'),
-        garments,
-        score,
-        breakdown,
-        explanation: explain(garments, breakdown, occasion),
-      } satisfies OutfitRecommendation;
-    })
-    .sort((a, b) => b.score - a.score)
-    .filter((recommendation, index, all) => {
-      const shoeId = recommendation.garments.find((garment) => garment.category === 'footwear')?.id;
-      const prior = all.slice(0, index);
-      const exactDuplicate = prior.some((item) => item.id === recommendation.id);
-      if (exactDuplicate) return false;
-
-      // Encourage visible variety without making diversity a hard styling constraint.
-      const sameShoeCount = prior
-        .slice(0, limit)
-        .filter((item) => item.garments.some((garment) => garment.id === shoeId)).length;
-      return sameShoeCount < 2;
-    })
-    .slice(0, limit);
+  if (limit <= 0 || !Number.isFinite(limit)) return [];
+  const locks = [...new Set([...lockedGarmentIds, ...(lockedGarmentId ? [lockedGarmentId] : [])])];
+  const ranked: OutfitRecommendation[] = [];
+  for (const candidate of buildCandidates(wardrobe, locks)) {
+    const recommendation = evaluateOutfit(candidate, { occasion, weather, styleProfile, now });
+    if (recommendation) ranked.push(recommendation);
+  }
+  ranked.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  const selected: OutfitRecommendation[] = [];
+  const selectedIds = new Set<string>();
+  const shoeCounts = new Map<string, number>();
+  for (const item of ranked) {
+    const shoe = item.garments.find((garment) => garment.category === 'footwear')?.id ?? '';
+    if (selectedIds.has(item.id) || (shoeCounts.get(shoe) ?? 0) >= 2) continue;
+    selected.push(item);
+    selectedIds.add(item.id);
+    shoeCounts.set(shoe, (shoeCounts.get(shoe) ?? 0) + 1);
+    if (selected.length >= limit) return selected;
+  }
+  // A lock on the only pair of shoes must not discard otherwise valid alternatives.
+  for (const item of ranked) {
+    if (!selectedIds.has(item.id)) {
+      selected.push(item);
+      selectedIds.add(item.id);
+    }
+    if (selected.length >= limit) break;
+  }
+  return selected;
 }

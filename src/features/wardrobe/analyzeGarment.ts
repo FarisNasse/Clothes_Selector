@@ -30,8 +30,10 @@ export async function analyzeGarmentImage(params: {
   uri: string;
   mimeType?: string | null;
   userId: string;
+  onStage?: (stage: 'uploading' | 'analyzing') => void;
 }): Promise<{ analysis: GarmentAnalysis; storagePath: string | null }> {
   if (env.demoMode || !supabase) {
+    params.onStage?.('analyzing');
     await new Promise((resolve) => setTimeout(resolve, 650));
     return { analysis: demoAnalysis, storagePath: null };
   }
@@ -41,25 +43,29 @@ export async function analyzeGarmentImage(params: {
   const response = await fetch(params.uri);
   const file = await response.arrayBuffer();
 
-  const { error: uploadError } = await supabase.storage.from('garment-images').upload(storagePath, file, {
-    contentType: params.mimeType ?? 'image/jpeg',
-    upsert: false,
-  });
+  params.onStage?.('uploading');
+  const { error: uploadError } = await supabase.storage
+    .from('garment-images')
+    .upload(storagePath, file, {
+      contentType: params.mimeType ?? 'image/jpeg',
+      upsert: false,
+    });
   if (uploadError) throw uploadError;
 
-  const { data, error } = await supabase.functions.invoke('analyze-garment', {
-    body: { storagePath },
-  });
-  if (error) {
-    await supabase.storage.from('garment-images').remove([storagePath]);
+  try {
+    params.onStage?.('analyzing');
+    const { data, error } = await supabase.functions.invoke('analyze-garment', {
+      body: { storagePath },
+    });
+    if (error) throw error;
+    const parsed = garmentAnalysisSchema.safeParse(data);
+    if (!parsed.success) throw new Error('Garment analysis returned an unexpected shape.');
+    return { analysis: parsed.data, storagePath };
+  } catch (error) {
+    await supabase.storage
+      .from('garment-images')
+      .remove([storagePath])
+      .catch(() => {});
     throw error;
   }
-
-  const parsed = garmentAnalysisSchema.safeParse(data);
-  if (!parsed.success) {
-    await supabase.storage.from('garment-images').remove([storagePath]);
-    throw new Error('Garment analysis returned an unexpected shape.');
-  }
-
-  return { analysis: parsed.data, storagePath };
 }

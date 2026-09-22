@@ -1,37 +1,74 @@
-import { StyleSheet, View } from 'react-native';
-
-import { GarmentImage } from '@/components/garment/GarmentImage';
+import { View, useWindowDimensions } from 'react-native';
+import { GarmentImage } from './GarmentImage';
 import { AppText } from '@/components/primitives/AppText';
-import { semanticColors } from '@/design/colors';
-import { radius } from '@/design/radii';
-import { space } from '@/design/spacing';
+import { Entrance } from '@/components/motion/Entrance';
+import { useExperience } from '@/providers/ExperienceProvider';
 import type { Garment } from '@/types/domain';
-
-export function GarmentHero({ garment }: { garment: Garment }) {
+import type { ReactNode } from 'react';
+export function GarmentHero({ garment, actions }: { garment: Garment; actions?: ReactNode }) {
+  const { width } = useWindowDimensions();
+  const { colors: c } = useExperience();
+  const wide = width >= 850;
   return (
-    <View style={styles.root}>
-      <GarmentImage garment={garment} variant="hero" showLabel={false} />
-      <View style={styles.copy}>
-        <View style={styles.kickerRow}>
-          <AppText variant="eyebrow">{garment.brand ?? 'Wardrobe piece'}</AppText>
-          <View style={styles.wearBadge}>
-            <AppText variant="micro" style={styles.wearText}>{garment.wearCount} wears</AppText>
-          </View>
-        </View>
-        <AppText variant="display">{garment.name}</AppText>
-        <AppText variant="muted" style={styles.meta}>
-          {garment.primaryColor} · {garment.subcategory} · {garment.fit} fit
+    <View style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 48 : 26, paddingTop: 20 }}>
+      <Entrance style={{ flex: wide ? 1.2 : undefined }}>
+        <GarmentImage garment={garment} variant="hero" />
+      </Entrance>
+      <Entrance
+        delay={90}
+        style={{ flex: wide ? 1 : undefined, justifyContent: 'center', gap: 18 }}
+      >
+        <AppText variant="eyebrow">{garment.brand ?? 'A piece of your wardrobe'}</AppText>
+        <AppText
+          variant="displayXL"
+          accessibilityRole="header"
+          style={width < 380 ? { fontSize: 36, lineHeight: 41 } : undefined}
+        >
+          {garment.name}
         </AppText>
-      </View>
+        <AppText variant="muted" style={{ textTransform: 'capitalize' }}>
+          {garment.primaryColor} · {garment.fit} ·{' '}
+          {garment.materials.join(' / ') || garment.subcategory}
+        </AppText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {garment.styleTags.map((tag) => (
+            <View
+              key={tag}
+              style={{
+                paddingVertical: 7,
+                paddingHorizontal: 12,
+                borderRadius: 20,
+                backgroundColor: c.canvas.sunken,
+              }}
+            >
+              <AppText variant="metadata">{tag}</AppText>
+            </View>
+          ))}
+        </View>
+        {actions}
+        <View style={{ borderTopWidth: 1, borderColor: c.border.subtle, paddingTop: 20, gap: 6 }}>
+          <AppText variant="bodySmall">
+            {garment.wearCount === 0
+              ? 'Ready for its first outing.'
+              : garment.wearCount + ' wears. Part of your story.'}
+          </AppText>
+          <AppText variant="metadata">
+            {garment.lastWornAt
+              ? 'Last worn ' +
+                new Date(garment.lastWornAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : 'No wear recorded yet.'}
+          </AppText>
+          {garment.purchasePrice !== null && garment.wearCount > 0 ? (
+            <AppText variant="metadata">
+              {'$' + (garment.purchasePrice / garment.wearCount).toFixed(2)} per recorded wear
+            </AppText>
+          ) : null}
+        </View>
+      </Entrance>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { gap: space.xl },
-  copy: { gap: space.sm },
-  kickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
-  wearBadge: { backgroundColor: semanticColors.accent.bronzeMist, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.sm },
-  wearText: { color: semanticColors.accent.bronze, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  meta: { textTransform: 'capitalize' },
-});

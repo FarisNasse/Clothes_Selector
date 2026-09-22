@@ -1,94 +1,89 @@
-import { StyleSheet, View } from 'react-native';
-
-import { OutfitPiece } from '@/components/outfit/OutfitPiece';
-import { semanticColors } from '@/design/colors';
-import { radius } from '@/design/radii';
-import { space } from '@/design/spacing';
+import { View } from 'react-native';
+import { OutfitPiece } from './OutfitPiece';
+import { compositionFor } from './composition';
+import { Entrance } from '@/components/motion/Entrance';
+import { AppText } from '@/components/primitives/AppText';
+import { useExperience } from '@/providers/ExperienceProvider';
 import type { Garment } from '@/types/domain';
-
 type Props = {
   garments: Garment[];
   lockedGarmentId?: string | null;
-  onGarmentPress?: (garment: Garment) => void;
+  lockedIds?: string[];
+  onGarmentPress?: ((garment: Garment) => void) | undefined;
+  label?: string;
 };
-
-export function OutfitFlatLay({ garments, lockedGarmentId = null, onGarmentPress }: Props) {
-  const top = garments.find((item) => item.category === 'top');
-  const bottom = garments.find((item) => item.category === 'bottom');
-  const footwear = garments.find((item) => item.category === 'footwear');
-  const outerwear = garments.find((item) => item.category === 'outerwear' || item.category === 'suit');
-  const accessory = garments.find((item) => item.category === 'accessory');
-
+export function OutfitFlatLay({
+  garments,
+  lockedGarmentId = null,
+  lockedIds = [],
+  onGarmentPress,
+  label = 'THE DAILY EDIT',
+}: Props) {
+  const { colors: c } = useExperience();
+  const positions = compositionFor(garments);
   return (
-    <View style={styles.canvas}>
-      <View style={styles.leftColumn}>
-        {outerwear ? (
-          <View style={styles.outerwear}>
-            <Piece garment={outerwear} lockedGarmentId={lockedGarmentId} onGarmentPress={onGarmentPress} />
+    <View
+      style={{
+        width: '100%',
+        aspectRatio: 0.95,
+        borderRadius: 28,
+        backgroundColor: c.canvas.sunken,
+        overflow: 'hidden',
+      }}
+    >
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: '9%',
+          top: '12%',
+          width: '75%',
+          height: '77%',
+          borderRadius: 160,
+          borderWidth: 1,
+          borderColor: c.border.strong,
+          opacity: 0.32,
+          transform: [{ rotate: '-22deg' }],
+        }}
+      />
+      <AppText
+        variant="micro"
+        style={{ position: 'absolute', top: 18, left: 20, letterSpacing: 2 }}
+      >
+        {label}
+      </AppText>
+      {garments.map((item, index) => {
+        const p = positions[item.id];
+        if (!p) return null;
+        return (
+          <View
+            key={item.id}
+            style={{
+              position: 'absolute',
+              left: (p.left + '%') as `${number}%`,
+              top: (p.top + '%') as `${number}%`,
+              width: (p.width + '%') as `${number}%`,
+              height: (p.height + '%') as `${number}%`,
+              zIndex: p.zIndex,
+              transform: [{ rotate: p.rotation + 'deg' }],
+            }}
+          >
+            <Entrance delay={index * 40} style={{ flex: 1 }}>
+              <OutfitPiece
+                garment={item}
+                locked={lockedIds.includes(item.id) || lockedGarmentId === item.id}
+                onPress={onGarmentPress ? () => onGarmentPress(item) : undefined}
+              />
+            </Entrance>
           </View>
-        ) : null}
-        {top ? (
-          <View style={[styles.top, !outerwear && styles.topWithoutLayer]}>
-            <Piece garment={top} lockedGarmentId={lockedGarmentId} onGarmentPress={onGarmentPress} />
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.rightColumn}>
-        {bottom ? (
-          <View style={styles.bottom}>
-            <Piece garment={bottom} lockedGarmentId={lockedGarmentId} onGarmentPress={onGarmentPress} />
-          </View>
-        ) : null}
-        {footwear ? (
-          <View style={styles.footwear}>
-            <Piece garment={footwear} lockedGarmentId={lockedGarmentId} onGarmentPress={onGarmentPress} />
-          </View>
-        ) : null}
-        {accessory ? (
-          <View style={styles.accessory}>
-            <Piece garment={accessory} lockedGarmentId={lockedGarmentId} onGarmentPress={onGarmentPress} />
-          </View>
-        ) : null}
-      </View>
+        );
+      })}
+      <AppText
+        variant="micro"
+        style={{ position: 'absolute', bottom: 16, left: 20, letterSpacing: 1 }}
+      >
+        {garments.length} PIECES. ALL YOURS.
+      </AppText>
     </View>
   );
 }
-
-function Piece({
-  garment,
-  lockedGarmentId,
-  onGarmentPress,
-}: {
-  garment: Garment;
-  lockedGarmentId: string | null;
-  onGarmentPress?: (garment: Garment) => void;
-}) {
-  return (
-    <OutfitPiece
-      garment={garment}
-      locked={garment.id === lockedGarmentId}
-      {...(onGarmentPress ? { onPress: () => onGarmentPress(garment) } : {})}
-    />
-  );
-}
-
-const styles = StyleSheet.create({
-  canvas: {
-    width: '100%',
-    aspectRatio: 0.96,
-    borderRadius: radius.media,
-    backgroundColor: semanticColors.canvas.sunken,
-    padding: space.md,
-    flexDirection: 'row',
-    gap: space.md,
-    overflow: 'hidden',
-  },
-  leftColumn: { flex: 1.1, gap: space.md },
-  rightColumn: { flex: 0.9, gap: space.md },
-  outerwear: { flex: 1.06 },
-  top: { flex: 0.94 },
-  topWithoutLayer: { flex: 1 },
-  bottom: { flex: 1.18 },
-  footwear: { flex: 0.72 },
-  accessory: { flex: 0.48 },
-});

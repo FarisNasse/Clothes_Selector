@@ -20,12 +20,15 @@ const config: ExpoConfig = {
     bundler: 'metro',
   },
   plugins: [
+    'expo-image',
     'expo-router',
     [
       'expo-image-picker',
       {
-        photosPermission: 'Clothes Selector uses your photo library to add garments to your private wardrobe.',
-        cameraPermission: 'Clothes Selector uses your camera to photograph garments for your private wardrobe.',
+        photosPermission:
+          'Clothes Selector uses your photo library to add garments to your private wardrobe.',
+        cameraPermission:
+          'Clothes Selector uses your camera to photograph garments for your private wardrobe.',
         microphonePermission: false,
       },
     ],
