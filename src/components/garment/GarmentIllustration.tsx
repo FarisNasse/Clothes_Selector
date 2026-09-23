@@ -34,7 +34,7 @@ export function GarmentIllustration({
   const jacket = garment.category === 'outerwear' || garment.category === 'suit';
   const fill = 'url(#' + id + ')';
   return (
-    <Svg width="100%" height="100%" viewBox="0 0 220 280" accessible={false}>
+    <Svg width="100%" height="100%" viewBox="0 0 220 280" aria-hidden focusable={false}>
       <Defs>
         <LinearGradient id={id} x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0" stopColor={tone} stopOpacity="0.84" />

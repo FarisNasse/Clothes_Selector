@@ -10,10 +10,10 @@ import { GarmentIllustration } from '@/components/garment/GarmentIllustration';
 import { useSession } from '@/providers/SessionProvider';
 import { useExperience } from '@/providers/ExperienceProvider';
 export default function SignInScreen() {
-  const { session, isDemo, signIn, signUp } = useSession();
+  const { session, isDemo, signIn, signUp, requestPasswordReset } = useSession();
   const { colors: c } = useExperience();
   const { width } = useWindowDimensions();
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
+  const [mode, setMode] = useState<'sign-in' | 'sign-up' | 'forgot'>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
@@ -22,8 +22,12 @@ export default function SignInScreen() {
   if (isDemo || session) return <Redirect href="/(tabs)" />;
   async function submit() {
     if (busy) return;
-    if (!email.includes('@') || !password) {
-      setMessage('Enter your email address and password to continue.');
+    if (!email.includes('@') || (mode !== 'forgot' && password.length < 8)) {
+      setMessage(
+        !email.includes('@')
+          ? 'Enter the email address used for your account.'
+          : 'Use a password with at least 8 characters.',
+      );
       setConfirmation(false);
       return;
     }
@@ -34,16 +38,18 @@ export default function SignInScreen() {
       const error =
         mode === 'sign-in'
           ? await signIn(email.trim(), password)
-          : await signUp(email.trim(), password);
-      if (error)
-        setMessage(
-          mode === 'sign-in'
-            ? 'We could not sign you in. Check your email and password, then try again.'
-            : 'We could not create this account. Check your details and try again.',
-        );
+          : mode === 'sign-up'
+            ? await signUp(email.trim(), password)
+            : await requestPasswordReset(email.trim());
+      if (error) setMessage(error);
       else if (mode === 'sign-up') {
         setConfirmation(true);
         setMessage('Check your email for a confirmation link, then come back to sign in.');
+      } else if (mode === 'forgot') {
+        setConfirmation(true);
+        setMessage(
+          'If an account uses that email, a reset link is on its way. Check your spam folder too.',
+        );
       }
     } catch {
       setMessage('We could not connect. Check your connection and try again.');
@@ -110,8 +116,17 @@ export default function SignInScreen() {
           </View>
           <View style={{ flex: 1, justifyContent: 'center', gap: 20, maxWidth: 450 }}>
             <AppText variant="title">
-              {mode === 'sign-in' ? 'Welcome back.' : 'Make room for possibility.'}
+              {mode === 'sign-in'
+                ? 'Welcome back.'
+                : mode === 'sign-up'
+                  ? 'Make room for possibility.'
+                  : 'Choose a new password.'}
             </AppText>
+            {mode === 'forgot' ? (
+              <AppText variant="muted">
+                Enter the email used for your account. We will send a secure reset link.
+              </AppText>
+            ) : null}
             <TextField
               label="Email"
               autoCapitalize="none"
@@ -121,37 +136,54 @@ export default function SignInScreen() {
               onChangeText={setEmail}
               editable={!busy}
             />
-            <TextField
-              label="Password"
-              autoCapitalize="none"
-              autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              editable={!busy}
-              onSubmitEditing={submit}
-            />
+            {mode !== 'forgot' ? (
+              <TextField
+                label="Password"
+                autoCapitalize="none"
+                autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                editable={!busy}
+                onSubmitEditing={submit}
+              />
+            ) : null}
             {message ? (
               <Notice message={message} tone={confirmation ? 'success' : 'error'} />
             ) : null}
             <Button
-              label={mode === 'sign-in' ? 'Sign in' : 'Create account'}
+              label={
+                mode === 'sign-in'
+                  ? 'Sign in'
+                  : mode === 'sign-up'
+                    ? 'Create account'
+                    : 'Send reset link'
+              }
               loading={busy}
               onPress={submit}
             />
             <Button
-              label={
-                mode === 'sign-in'
-                  ? 'New here? Create an account'
-                  : 'Already have an account? Sign in'
-              }
+              label={mode === 'sign-in' ? 'New here? Create an account' : 'Back to sign in'}
               variant="quiet"
               disabled={busy}
               onPress={() => {
                 setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
                 setMessage(null);
+                setConfirmation(false);
               }}
             />
+            {mode === 'sign-in' ? (
+              <Button
+                label="Forgot your password?"
+                variant="quiet"
+                disabled={busy}
+                onPress={() => {
+                  setMode('forgot');
+                  setMessage(null);
+                  setConfirmation(false);
+                }}
+              />
+            ) : null}
           </View>
         </View>
       </Screen>

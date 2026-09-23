@@ -15,7 +15,7 @@ major_version = 17
 [auth]
 enabled = true
 site_url = "clothesselector://"
-additional_redirect_urls = ["clothesselector://**"]
+additional_redirect_urls = ["clothesselector://**", "http://localhost:*/sign-in", "http://localhost:*/reset-password", "http://127.0.0.1:*/sign-in", "http://127.0.0.1:*/reset-password"]
 jwt_expiry = 3600
 enable_signup = true
 

@@ -1,7 +1,8 @@
 import 'react-native-url-polyfill/auto';
-import 'expo-sqlite/localStorage/install';
+import '@/lib/installStorage';
 
 import { createClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 import { env } from '@/lib/env';
 
@@ -11,7 +12,9 @@ export const supabase = env.isSupabaseConfigured
         storage: localStorage,
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: false,
+        // Supabase exchanges email confirmation and recovery links automatically in a browser.
+        // Native links are exchanged by SessionProvider after Expo Linking receives the URL.
+        detectSessionInUrl: Platform.OS === 'web',
       },
     })
   : null;

@@ -61,7 +61,7 @@ Screen/image entrances approximate visual continuity using supported Reanimated 
 Completed during implementation:
 
 - TypeScript and ESLint.
-- 14 automated domain tests: inventory integrity, hard compatibility, multiple locks, locked shoes, suit/accessory anchors, swaps, undo, index wrapping, context reset, deterministic large-wardrobe sampling, compound filters, immutable sorting, owner-isolated device persistence, corrupt storage, and capture validation.
+- 15 automated tests: auth error handling, inventory integrity, hard compatibility, multiple locks, locked shoes, suit/accessory anchors, swaps, undo, index wrapping, context reset, deterministic large-wardrobe sampling, compound filters, immutable sorting, owner-isolated device persistence, corrupt storage, and capture validation.
 - Production web export and Android/iOS Hermes bundle exports.
 - Browser interaction checks: navigation, lock/unlock, another look, compatible swap/undo, wear confirmation, favorite/filter/search, saved look reload/reopen, style preference save, anchored styling, garment edit/delete, photo review/save, and dark appearance persistence.
 - Rendered review at 320, 390, 768, and 1440 pixels, with compact heading fixes. Normal/reduced-motion rendering and sheet keyboard focus trapping, Escape dismissal, and focus restoration were exercised.
@@ -71,3 +71,17 @@ Completed during implementation:
 Not verified here: physical-device camera permissions/cancel behavior, native drag/haptic feel, VoiceOver/TalkBack and large Dynamic Type, authenticated Supabase mutations, remote analysis failure cleanup, and device frame-rate profiling. Bundle export validates compilation; it does not replace those runtime checks. Run them before a release, alongside the existing `LAUNCH_CHECKLIST.md`.
 
 The signed-out web shell can be checked without creating an account. Real sign-in/sign-up, upload, analysis, deletion, preference persistence and transactional wear should be tested against a staging account before deployment.
+
+## Account recovery and hosted Auth settings
+
+The sign-in screen includes **Forgot your password?**. It sends a Supabase recovery email and opens the public `/reset-password` route, where the authenticated recovery session can choose a new password. Existing passwords cannot be read back from Supabase because Auth stores a one-way hash.
+
+In the hosted Supabase Dashboard, add the deployed web reset URL and the native scheme to **Authentication → URL Configuration → Redirect URLs**. For local web development, allow the localhost origin used by Expo. Examples:
+
+- `http://localhost:8081/reset-password`
+- `http://localhost:8081/sign-in`
+- `https://your-production-domain.example/reset-password`
+- `https://your-production-domain.example/sign-in`
+- `clothesselector://**`
+
+The local `supabase/config.toml` contains equivalent localhost/native entries for local Supabase, but it does not change the hosted project's dashboard configuration.

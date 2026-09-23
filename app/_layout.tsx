@@ -48,6 +48,7 @@ function Navigation() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Protected guard={isDemo || Boolean(session)}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen

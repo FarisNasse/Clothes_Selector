@@ -1,4 +1,4 @@
-import 'expo-sqlite/localStorage/install';
+import '@/lib/installStorage';
 import {
   createContext,
   useContext,
