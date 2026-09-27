@@ -62,6 +62,8 @@ npm start
 ```
 
 Leave `EXPO_PUBLIC_DEMO_MODE=true` to present the application without Supabase or AI credentials.
+Edit `.env`, not `.env.example`; Expo reads `.env` when it starts. If `.env` is missing,
+the app defaults to demo mode. After changing the flag, restart Expo with `npx expo start --clear`.
 
 ### Web dependency repair
 
@@ -103,6 +105,12 @@ supabase functions deploy analyze-garment
 ```
 
 Never put `OPENAI_API_KEY` or a Supabase service-role key in an `EXPO_PUBLIC_*` variable. Expo public values are bundled into the client application.
+
+### Photo upload and API fallback
+
+- Demo mode accepts a selected photo without uploading it or calling the API; it shows clearly labeled sample details and stores additions for the current session only.
+- Connected mode requires a signed-in user, the `garment-images` Storage bucket and policies, and the `garments` database table. After a successful photo upload, an OpenAI or Edge Function failure opens manual entry. Fill in name, piece type, and color, check the other defaults, then save the actual uploaded photo and garment. No OpenAI credits are needed for manual entry.
+- If the photo cannot be read or uploaded, the app reports a read, format, size, or upload error. Manual entry cannot save an image that never reached Storage. Inspect Storage policies and your session for upload errors; inspect Edge Function logs for analysis errors.
 
 ## Validation
 

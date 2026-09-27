@@ -30,7 +30,7 @@ export default function AddGarmentScreen() {
           capture.saved
             ? 'Welcome to the rotation.'
             : capture.draft
-              ? 'We found the details.'
+              ? capture.manualFallback ? 'Add the details yourself.' : 'We found the details.'
               : 'Every piece\nhas potential.'
         }
       />
@@ -111,11 +111,18 @@ export default function AddGarmentScreen() {
                 }}
               />
             ) : null}
-            <AppText variant="metadata">
-              {capture.isDemo
-                ? 'Demo analysis uses sample details. Adjust them to match your photo.'
-                : 'Make it yours. Check the details before adding this piece.'}
-            </AppText>
+            {capture.manualFallback ? (
+              <Notice
+                tone="info"
+                message="Your photo uploaded, but automatic analysis is unavailable. Enter a name, piece type, and color; check the other settings, then add it to your wardrobe."
+              />
+            ) : (
+              <AppText variant="metadata">
+                {capture.isDemo
+                  ? 'Demo analysis uses sample details. Adjust them to match your photo.'
+                  : 'Make it yours. Check the details before adding this piece.'}
+              </AppText>
+            )}
             {capture.draft.aiConfidence !== null ? (
               <AppText variant="metadata">
                 {Math.round(capture.draft.aiConfidence * 100)}% analysis confidence

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { garmentAnalysisSchema } from './analysisSchema';
 export const garmentDraftSchema = garmentAnalysisSchema.omit({ confidence: true }).extend({
+  // Manual entries can have no style tags without inventing one.
+  styleTags: z.array(z.string().max(40)).max(8),
   name: z.string().trim().min(1).max(120),
   subcategory: z.string().trim().min(1).max(80),
   primaryColor: z.string().trim().min(1).max(40),

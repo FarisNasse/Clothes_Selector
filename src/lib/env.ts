@@ -12,5 +12,6 @@ export const env = {
   supabaseUrl,
   supabasePublishableKey,
   isSupabaseConfigured: true,
-  demoMode: process.env.EXPO_PUBLIC_DEMO_MODE === 'true',
+  // A missing .env starts in demo mode; connected mode requires an explicit false.
+  demoMode: process.env.EXPO_PUBLIC_DEMO_MODE !== 'false',
 } as const;

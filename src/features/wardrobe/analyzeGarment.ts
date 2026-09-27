@@ -1,6 +1,8 @@
-import { garmentAnalysisSchema, type GarmentAnalysis } from '@/features/wardrobe/analysisSchema';
+import type { GarmentAnalysis } from '@/features/wardrobe/analysisSchema';
 import { env } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
+import { GarmentImageError } from './pickedImage';
+import { tryGarmentAnalysis } from './analysisAttempt';
 
 const demoAnalysis: GarmentAnalysis = {
   category: 'top',
@@ -27,45 +29,46 @@ function extensionForMime(mimeType?: string | null) {
 }
 
 export async function analyzeGarmentImage(params: {
-  uri: string;
-  mimeType?: string | null;
+  data: ArrayBuffer;
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
   userId: string;
   onStage?: (stage: 'uploading' | 'analyzing') => void;
-}): Promise<{ analysis: GarmentAnalysis; storagePath: string | null }> {
-  if (env.demoMode || !supabase) {
+}): Promise<
+  | { analysis: GarmentAnalysis; storagePath: string | null; manualFallback: false }
+  | { analysis: null; storagePath: string; manualFallback: true }
+> {
+  const client = supabase;
+  if (env.demoMode || !client) {
     params.onStage?.('analyzing');
     await new Promise((resolve) => setTimeout(resolve, 650));
-    return { analysis: demoAnalysis, storagePath: null };
+    return { analysis: demoAnalysis, storagePath: null, manualFallback: false };
   }
 
   const extension = extensionForMime(params.mimeType);
   const storagePath = `${params.userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-  const response = await fetch(params.uri);
-  const file = await response.arrayBuffer();
-
   params.onStage?.('uploading');
-  const { error: uploadError } = await supabase.storage
-    .from('garment-images')
-    .upload(storagePath, file, {
-      contentType: params.mimeType ?? 'image/jpeg',
-      upsert: false,
-    });
-  if (uploadError) throw uploadError;
-
   try {
-    params.onStage?.('analyzing');
-    const { data, error } = await supabase.functions.invoke('analyze-garment', {
-      body: { storagePath },
-    });
-    if (error) throw error;
-    const parsed = garmentAnalysisSchema.safeParse(data);
-    if (!parsed.success) throw new Error('Garment analysis returned an unexpected shape.');
-    return { analysis: parsed.data, storagePath };
-  } catch (error) {
-    await supabase.storage
+    const { error: uploadError } = await client.storage
       .from('garment-images')
-      .remove([storagePath])
-      .catch(() => {});
-    throw error;
+      .upload(storagePath, params.data, {
+        contentType: params.mimeType,
+        upsert: false,
+      });
+    if (uploadError) throw uploadError;
+  } catch (error) {
+    throw new GarmentImageError('upload', error);
   }
+
+  params.onStage?.('analyzing');
+  const attempt = await tryGarmentAnalysis(() =>
+    client.functions.invoke('analyze-garment', {
+      body: { storagePath },
+    }),
+  );
+  if (attempt.analysis)
+    return { analysis: attempt.analysis, storagePath, manualFallback: false };
+
+  // Preserve the uploaded photo so it can still be saved with manually entered details.
+  console.warn('Automatic garment analysis failed; switching to manual entry.', attempt.error);
+  return { analysis: null, storagePath, manualFallback: true };
 }

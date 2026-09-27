@@ -24,6 +24,30 @@ export function analysisToDraft(analysis: GarmentAnalysis, storagePath: string |
   };
 }
 
+// Required identifying fields stay empty until the user supplies real details.
+export function manualGarmentDraft(storagePath: string, imageUrl: string): GarmentDraft {
+  return {
+    category: 'top',
+    subcategory: '',
+    name: '',
+    brand: null,
+    primaryColor: '',
+    secondaryColors: [],
+    pattern: 'unknown',
+    materials: [],
+    fit: 'regular',
+    formality: 5,
+    warmth: 5,
+    waterproof: false,
+    seasons: ['all-season'],
+    styleTags: [],
+    imageUrl,
+    storagePath,
+    purchasePrice: null,
+    aiConfidence: null,
+  };
+}
+
 export function garmentToDraft(garment: Garment): GarmentDraft {
   return {
     category: garment.category,

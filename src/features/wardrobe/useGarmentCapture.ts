@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 import { analyzeGarmentImage } from './analyzeGarment';
-import { analysisToDraft } from './draft';
+import { analysisToDraft, manualGarmentDraft } from './draft';
 import { discardStagedGarmentImage } from './stagedImage';
+import { GarmentImageError, readPickedImage } from './pickedImage';
 import { garmentDraftSchema } from './validation';
 import { useSession } from '@/providers/SessionProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
@@ -19,6 +21,7 @@ export function useGarmentCapture() {
   const [saved, setSaved] = useState<Garment | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
+  const [manualFallback, setManualFallback] = useState(false);
   const active = useRef(true);
   const operation = useRef<Busy>(null);
   const staged = useRef(new Set<string>());
@@ -50,9 +53,12 @@ export function useGarmentCapture() {
     const userId = isDemo ? 'demo-user' : session?.user.id;
     if (!userId) throw new Error('Authentication required');
     stage('uploading');
+    // Demo mode uses sample details and needs no photo bytes or network request.
+    const image = isDemo
+      ? { data: new ArrayBuffer(0), mimeType: 'image/jpeg' as const }
+      : await readPickedImage(selected, Platform.OS === 'web');
     const result = await analyzeGarmentImage({
-      uri: selected.uri,
-      mimeType: selected.mimeType ?? null,
+      ...image,
       userId,
       onStage: (value) => stage(value),
     });
@@ -61,7 +67,12 @@ export function useGarmentCapture() {
       if (result.storagePath) await discard(result.storagePath);
       return;
     }
-    setDraft({ ...analysisToDraft(result.analysis, result.storagePath), imageUrl: selected.uri });
+    setManualFallback(result.manualFallback);
+    setDraft(
+      result.manualFallback
+        ? manualGarmentDraft(result.storagePath, selected.uri)
+        : { ...analysisToDraft(result.analysis, result.storagePath), imageUrl: selected.uri },
+    );
     haptic('success');
   }
   async function choose(source: 'camera' | 'library') {
@@ -69,7 +80,7 @@ export function useGarmentCapture() {
     stage('picking');
     setError(null);
     try {
-      const permission =
+      const permission = Platform.OS === 'web' ? { granted: true } :
         source === 'camera'
           ? await ImagePicker.requestCameraPermissionsAsync()
           : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -82,28 +93,28 @@ export function useGarmentCapture() {
           );
         return;
       }
-      const options: ImagePicker.ImagePickerOptions = { quality: 0.82, mediaTypes: ['images'] };
+      const options: ImagePicker.ImagePickerOptions = {
+        quality: 0.82,
+        mediaTypes: ['images'],
+        base64: Platform.OS !== 'web',
+      };
       const result =
         source === 'camera'
           ? await ImagePicker.launchCameraAsync(options)
           : await ImagePicker.launchImageLibraryAsync(options);
       const selected = result.assets?.[0];
       if (!active.current || result.canceled || !selected) return;
-      if (selected.fileSize && selected.fileSize > 12 * 1024 * 1024) {
-        setError('Choose a photo smaller than 12 MB.');
-        return;
-      }
       for (const path of staged.current) {
         await discard(path);
       }
       setAsset(selected);
       setDraft(null);
+      setManualFallback(false);
       setSaved(null);
       await analyze(selected);
-    } catch {
-      if (active.current)
-        setError('We could not read this photo. Try again or choose a different photo.');
-      console.warn('Garment capture or analysis did not complete.');
+    } catch (failure) {
+      if (active.current) setError(captureMessage(failure));
+      console.warn('Garment capture or analysis did not complete.', failure);
     } finally {
       stage(null);
     }
@@ -113,9 +124,9 @@ export function useGarmentCapture() {
     setError(null);
     try {
       await analyze(asset);
-    } catch {
-      if (active.current)
-        setError('We could not read this photo. Try another image with a plain background.');
+    } catch (failure) {
+      if (active.current) setError(captureMessage(failure));
+      console.warn('Garment analysis retry failed.', failure);
     } finally {
       stage(null);
     }
@@ -152,5 +163,17 @@ export function useGarmentCapture() {
         }
     }
   }
-  return { asset, draft, setDraft, saved, busy, error, choose, retry, save, isDemo };
+  return { asset, draft, setDraft, saved, busy, error, manualFallback, choose, retry, save, isDemo };
+}
+
+function captureMessage(failure: unknown) {
+  if (!(failure instanceof GarmentImageError))
+    return 'Could not open the photo picker. Try again or check camera/photo permissions.';
+  switch (failure.kind) {
+    case 'size': return 'This photo is over 12 MB. Choose a smaller photo.';
+    case 'format': return 'This format is not supported. Choose a JPEG, PNG, or WebP photo.';
+    case 'read': return 'We could not read this photo. Try again or choose a different photo.';
+    case 'upload': return 'We could not upload the photo. Check your connection and sign-in, then try again.';
+    case 'analysis': return 'The photo uploaded, but analysis is unavailable. Try again in a moment.';
+  }
 }
