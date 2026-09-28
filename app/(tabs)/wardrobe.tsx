@@ -30,7 +30,7 @@ const categories: [GarmentCategory | 'all', string][] = [
 ];
 export default function WardrobeScreen() {
   const { garments, loading, error, refresh } = useWardrobe();
-  const { favorites, toggleFavorite, error: collectionError } = useCollection();
+  const { favorites, looks, toggleFavorite, error: collectionError } = useCollection();
   const { colors: c, haptic } = useExperience();
   const { width } = useWindowDimensions();
   const [query, setQuery] = useState('');
@@ -38,6 +38,8 @@ export default function WardrobeScreen() {
   const [focused, setFocused] = useState(false);
   const [filters, setFilters] = useState(defaultFilters);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [view, setView] = useState<'closet' | 'catalog'>('closet');
+  const [group, setGroup] = useState<'all' | 'favorites' | 'unworn' | 'recent'>('all');
   const visible = useMemo(
     () => filterWardrobe(garments, deferredQuery, filters, favorites),
     [garments, deferredQuery, filters, favorites],
@@ -53,19 +55,26 @@ export default function WardrobeScreen() {
       ].sort(),
     [garments],
   );
-  const columns = width >= 1200 ? 5 : width >= 900 ? 4 : width >= 700 ? 3 : 2;
+  const grouped = useMemo(() => {
+    if (group === 'favorites') return visible.filter((item) => favorites.includes(item.id));
+    if (group === 'unworn') return visible.filter((item) => item.wearCount === 0);
+    if (group === 'recent') return visible.filter((item) => item.lastWornAt).sort((a, b) => (b.lastWornAt ?? '').localeCompare(a.lastWornAt ?? ''));
+    return visible;
+  }, [visible, group, favorites]);
+  const columns = view === 'closet' ? (width >= 900 ? 3 : 2) : width >= 1200 ? 5 : width >= 900 ? 4 : width >= 700 ? 3 : 2;
   const padding = width < 380 ? 16 : width < 700 ? 24 : 40;
   const tileWidth = (Math.min(width, layout.maxWidth) - padding * 2 - 14 * (columns - 1)) / columns;
   const extraFilters = activeFilterCount(filters);
   const clear = () => {
     setQuery('');
     setFilters(defaultFilters);
+    setGroup('all');
   };
   return (
     <Screen scroll={false} padded={false}>
       <FlatList
-        key={columns}
-        data={visible}
+        key={columns + view}
+        data={grouped}
         numColumns={columns}
         keyExtractor={(item) => item.id}
         initialNumToRender={12}
@@ -147,6 +156,19 @@ export default function WardrobeScreen() {
                 />
               ))}
             </ScrollView>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingBottom: 16 }}>
+              <AppText variant="eyebrow" style={{ marginRight: 6 }}>Your closet</AppText>
+              {(['all', 'favorites', 'unworn', 'recent'] as const).map((value) => <Chip key={value} label={{ all: 'All', favorites: 'Favorites', unworn: 'Never worn', recent: 'Recently worn' }[value]} selected={group === value} onPress={() => setGroup(value)} />)}
+              <View style={{ flex: 1 }} />
+              <Chip label="Closet" selected={view === 'closet'} onPress={() => setView('closet')} />
+              <Chip label="Catalog" selected={view === 'catalog'} onPress={() => setView('catalog')} />
+            </View>
+            {query.trim() ? <View style={{ padding: 14, marginBottom: 15, backgroundColor: c.canvas.editorial, borderRadius: 16, gap: 10 }}>
+              <AppText variant="eyebrow">Search your wardrobe / {grouped.length} pieces</AppText>
+              {colors.filter((color) => color.includes(query.trim().toLowerCase())).length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}><AppText variant="metadata">COLORS</AppText>{colors.filter((color) => color.includes(query.trim().toLowerCase())).slice(0, 4).map((color) => <Chip key={color} label={color} selected={filters.color === color} onPress={() => setFilters((current) => ({ ...current, color }))} />)}</View> : null}
+              {categories.filter(([, label]) => label.toLowerCase().includes(query.trim().toLowerCase())).length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}><AppText variant="metadata">CATEGORIES</AppText>{categories.filter(([, label]) => label.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 3).map(([category, label]) => <Chip key={category} label={label} selected={filters.category === category} onPress={() => { setFilters((current) => ({ ...current, category })); setQuery(''); }} />)}</View> : null}
+              {looks.filter((look) => look.occasion.includes(query.trim().toLowerCase())).slice(0, 2).map((look) => <Button key={look.id} label={'Saved ' + look.occasion + ' look'} variant="quiet" onPress={() => router.push({ pathname: '/look/[id]', params: { id: look.id } })} />)}
+            </View> : null}
             <View
               style={{
                 flexDirection: 'row',
@@ -156,7 +178,7 @@ export default function WardrobeScreen() {
               }}
             >
               <AppText variant="eyebrow">
-                {visible.length} {visible.length === 1 ? 'piece' : 'pieces'}
+                {grouped.length} {grouped.length === 1 ? 'piece' : 'pieces'}
                 {extraFilters ? ' / ' + extraFilters + ' filters' : ''}
               </AppText>
               <Button
@@ -181,11 +203,13 @@ export default function WardrobeScreen() {
           <GarmentTile
             garment={item}
             width={tileWidth}
+            editorial={view === 'closet'}
             favorite={favorites.includes(item.id)}
             onFavorite={() => {
               if (toggleFavorite(item.id)) haptic();
             }}
             onPress={() => router.push({ pathname: '/garment/[id]', params: { id: item.id } })}
+            onStyle={() => router.push({ pathname: '/garment/[id]', params: { id: item.id, style: '1' } })}
           />
         )}
         ListEmptyComponent={
@@ -193,12 +217,12 @@ export default function WardrobeScreen() {
             <WardrobeSkeleton columns={columns} tileWidth={tileWidth} />
           ) : error ? null : (
             <EmptyState
-              title={garments.length ? 'Nothing here. Yet.' : 'Your wardrobe starts here.'}
+              title={garments.length ? 'A quieter rail today.' : 'Your wardrobe starts here.'}
               detail={
                 garments.length
                   ? query
                     ? 'No pieces match “' + query + '” with these filters.'
-                    : 'Try a different filter to find your pieces.'
+                    : 'Try another collection or filter to find your pieces.'
                   : 'Start with a favorite top, a pair of trousers, and your go-to shoes.'
               }
               actionLabel={garments.length ? 'Clear filters' : 'Add your first piece'}

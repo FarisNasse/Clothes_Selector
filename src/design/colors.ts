@@ -25,6 +25,11 @@ export const semanticColors = {
     default: palette.parchment,
     elevated: palette.porcelain,
     sunken: palette.chalk,
+    editorial: '#EAE6DC',
+    media: '#E9E3D8',
+    inverse: palette.forestDeep,
+    floating: '#FFFEFA',
+    selected: palette.forestMist,
   },
   ink: {
     primary: palette.graphite,
@@ -58,7 +63,8 @@ export type Colors = {
   };
 };
 export const darkColors: Colors = {
-  canvas: { default: '#171C19', elevated: '#232B26', sunken: '#2C342E' },
+  canvas: { default: '#171C19', elevated: '#232B26', sunken: '#2C342E',
+    editorial: '#222B27', media: '#2E3530', inverse: '#14251C', floating: '#303A33', selected: '#365040' },
   ink: { primary: '#F3EFE5', secondary: '#C0C5BA', tertiary: '#A4AC9F', inverse: '#FBF9F5' },
   border: { subtle: '#39433A', strong: '#566354' },
   accent: {

@@ -8,4 +8,13 @@ export const motion = {
   pageTransition: 320,
   springSoft: { damping: 23, stiffness: 220, mass: 0.8 },
   springSnappy: { damping: 20, stiffness: 380, mass: 0.6 },
+  press: { duration: 120, scale: 0.975 },
+  selection: { damping: 22, stiffness: 280, mass: 0.75 },
+  sheetEnter: { duration: 320 },
+  sheetExit: { duration: 180 },
+  heroEnter: { duration: 440 },
+  garmentSwap: { duration: 290 },
+  success: { duration: 260 },
+  navigation: { duration: 260 },
+  ambient: { duration: 600 },
 } as const;

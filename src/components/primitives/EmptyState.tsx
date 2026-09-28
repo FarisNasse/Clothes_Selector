@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { BrandMark } from '@/components/brand/BrandMark';
 import { AppText } from './AppText';
 import { Button } from './Button';
 import { useExperience } from '@/providers/ExperienceProvider';
@@ -27,7 +27,7 @@ export function EmptyState({ title, detail, actionLabel, onAction }: Props) {
           justifyContent: 'center',
         }}
       >
-        <Ionicons name="shirt-outline" size={28} color={c.accent.forest} />
+        <BrandMark size={28} color={c.accent.forest} accent={c.accent.bronze} />
       </View>
       <AppText variant="title">{title}</AppText>
       <AppText variant="muted" style={{ maxWidth: 500 }}>

@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { GarmentIllustration } from './GarmentIllustration';
 import { useExperience } from '@/providers/ExperienceProvider';
 import type { Garment } from '@/types/domain';
+import { swatches } from './GarmentIllustration';
 
 export type GarmentImageVariant = 'grid' | 'hero' | 'outfit' | 'thumbnail' | 'capture' | 'preview';
 type Props = {
@@ -25,18 +26,18 @@ export function GarmentImage({ garment, variant = 'grid', style }: Props) {
       style={[
         styles.base,
         styles[variant],
-        { backgroundColor: variant === 'outfit' ? 'transparent' : c.canvas.sunken },
+        { backgroundColor: variant === 'outfit' ? 'transparent' : variant === 'hero' ? (swatches[garment.primaryColor.toLowerCase()] ?? c.canvas.media) + '25' : c.canvas.media },
         style,
       ]}
     >
       {garment.imageUrl && !failed ? (
         <Image
           source={{ uri: garment.imageUrl }}
-          contentFit="contain"
+          contentFit={variant === 'grid' ? 'cover' : 'contain'}
           style={styles.image}
-          cachePolicy="memory"
+          cachePolicy="memory-disk"
           recyclingKey={garment.id + garment.imageUrl}
-          transition={reducedMotion ? 0 : 200}
+          transition={reducedMotion ? 0 : 240}
           onError={() => setFailed(true)}
         />
       ) : (

@@ -10,14 +10,15 @@ import { garmentCategories, type Fit, type GarmentDraft, type Season } from '@/t
 const fits: Fit[] = ['slim', 'tailored', 'regular', 'relaxed', 'oversized'];
 const seasons: Season[] = ['spring', 'summer', 'fall', 'winter', 'all-season'];
 const colors = ['black', 'white', 'cream', 'navy', 'blue', 'brown', 'olive', 'gray', 'beige'];
-type Props = { value: GarmentDraft; onChange: (next: GarmentDraft) => void; disabled?: boolean };
-export function GarmentForm({ value, onChange, disabled = false }: Props) {
+type Props = { value: GarmentDraft; onChange: (next: GarmentDraft) => void; disabled?: boolean; step?: 'all' | 'essentials' | 'details' };
+export function GarmentForm({ value, onChange, disabled = false, step = 'all' }: Props) {
   const [advanced, setAdvanced] = useState(false);
   function update<K extends keyof GarmentDraft>(key: K, next: GarmentDraft[K]) {
     if (!disabled) onChange({ ...value, [key]: next });
   }
   return (
     <View style={{ gap: 24 }}>
+      {step !== 'details' ? <>
       <TextField
         label="Name · required"
         placeholder="e.g. Light blue Oxford shirt"
@@ -81,6 +82,8 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
           ))}
         </View>
       </View>
+      </> : null}
+      {step !== 'essentials' ? <>
       <Rating
         label="Dressiness · starts at 5"
         value={value.formality}
@@ -184,6 +187,7 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
           />
         </View>
       ) : null}
+      </> : null}
     </View>
   );
 }

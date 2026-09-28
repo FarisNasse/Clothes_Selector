@@ -11,6 +11,8 @@ type Props = {
   onPress: () => void;
   favorite?: boolean;
   onFavorite?: () => void;
+  onStyle?: () => void;
+  editorial?: boolean;
 };
 export const GarmentTile = memo(function GarmentTileContent({
   garment,
@@ -18,24 +20,25 @@ export const GarmentTile = memo(function GarmentTileContent({
   onPress,
   favorite = false,
   onFavorite,
+  onStyle,
+  editorial = false,
 }: Props) {
   return (
-    <View style={{ width, gap: 10, marginBottom: 24 }}>
+    <View style={{ width, gap: 10, marginBottom: editorial ? 32 : 24 }}>
       <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel={'View ' + garment.name}
         feedback
         onPress={onPress}
+        onLongPress={onStyle}
         style={{ borderRadius: 20 }}
       >
-        <GarmentImage garment={garment} variant="grid" />
+        <GarmentImage garment={garment} variant="grid" style={editorial ? { aspectRatio: .68, borderRadius: 24 } : undefined} />
         <View style={{ gap: 3, paddingTop: 12, paddingHorizontal: 2 }}>
           <AppText variant="bodySmall" numberOfLines={2} style={{ fontWeight: '500' }}>
             {garment.name}
           </AppText>
-          <AppText variant="metadata" numberOfLines={1}>
-            {garment.brand ?? garment.subcategory}
-          </AppText>
+          <AppText variant="metadata" numberOfLines={1}>{garment.brand ?? garment.subcategory} · {garment.wearCount ? garment.wearCount + ' wears' : 'New to rotation'}</AppText>
         </View>
       </AnimatedPressable>
       {onFavorite ? (
@@ -48,6 +51,7 @@ export const GarmentTile = memo(function GarmentTileContent({
           />
         </View>
       ) : null}
+      {onStyle ? <View style={{ alignSelf: 'flex-start', marginTop: -5 }}><IconButton icon="sparkles-outline" label={'Style ' + garment.name} onPress={onStyle} /></View> : null}
     </View>
   );
 });

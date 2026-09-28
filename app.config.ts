@@ -5,6 +5,8 @@ const config: ExpoConfig = {
   slug: 'clothes-selector',
   scheme: 'clothesselector',
   version: '0.1.0',
+  icon: './assets/brand/icon.png',
+  splash: { image: './assets/brand/splash.png', resizeMode: 'contain', backgroundColor: '#20362C' },
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
@@ -15,9 +17,11 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.farisnasse.clothesselector',
+    adaptiveIcon: { foregroundImage: './assets/brand/icon.png', backgroundColor: '#20362C' },
   },
   web: {
     bundler: 'metro',
+    favicon: './assets/brand/favicon.png',
   },
   plugins: [
     'expo-image',

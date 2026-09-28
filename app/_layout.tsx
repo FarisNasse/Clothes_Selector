@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ExperienceProvider, useExperience } from '@/providers/ExperienceProvider';
@@ -8,6 +9,13 @@ import { StyleProfileProvider } from '@/providers/StyleProfileProvider';
 import { WardrobeProvider } from '@/providers/WardrobeProvider';
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Inter: require('../assets/fonts/Inter-Regular.ttf'),
+    InterSemiBold: require('../assets/fonts/Inter-SemiBold.ttf'),
+    STIXGeneral: require('../assets/fonts/STIXGeneral-Regular.ttf'),
+    STIXGeneralBold: require('../assets/fonts/STIXGeneral-Bold.ttf'),
+  });
+  if (!fontsLoaded) return null;
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ExperienceProvider>
@@ -48,6 +56,7 @@ function Navigation() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Protected guard={isDemo || Boolean(session)}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -61,6 +70,7 @@ function Navigation() {
             options={{ title: 'The details', presentation: 'modal' }}
           />
           <Stack.Screen name="look/[id]" options={{ title: 'Saved look' }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         </Stack.Protected>
       </Stack>
     </>

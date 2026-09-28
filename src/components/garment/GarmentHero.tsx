@@ -1,18 +1,19 @@
 import { View, useWindowDimensions } from 'react-native';
 import { GarmentImage } from './GarmentImage';
+import { AnimatedPressable } from '@/components/motion/AnimatedPressable';
 import { AppText } from '@/components/primitives/AppText';
 import { Entrance } from '@/components/motion/Entrance';
 import { useExperience } from '@/providers/ExperienceProvider';
 import type { Garment } from '@/types/domain';
 import type { ReactNode } from 'react';
-export function GarmentHero({ garment, actions }: { garment: Garment; actions?: ReactNode }) {
+export function GarmentHero({ garment, actions, onImagePress }: { garment: Garment; actions?: ReactNode; onImagePress?: () => void }) {
   const { width } = useWindowDimensions();
   const { colors: c } = useExperience();
   const wide = width >= 850;
   return (
     <View style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 48 : 26, paddingTop: 20 }}>
-      <Entrance style={{ flex: wide ? 1.2 : undefined }}>
-        <GarmentImage garment={garment} variant="hero" />
+      <Entrance style={{ flex: wide ? 1.45 : undefined }}>
+        <AnimatedPressable accessibilityRole="button" accessibilityLabel={'Inspect ' + garment.name} disabled={!onImagePress} onPress={onImagePress} style={{ shadowColor: '#18251E', shadowOpacity: .12, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 3 }}><GarmentImage garment={garment} variant="hero" /></AnimatedPressable>
       </Entrance>
       <Entrance
         delay={90}

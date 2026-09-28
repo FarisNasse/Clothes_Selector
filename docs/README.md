@@ -24,3 +24,5 @@ Use this page as the entry point for engineering and product documentation. The 
 ## Keeping docs reliable
 
 Documentation should distinguish **implemented behavior**, **planned work**, and **unverified behavior**. Update the relevant guide in the same change as code or configuration changes. Avoid copying credentials, project secrets, real user data, or signed media URLs into docs or examples.
+
+- [Impressive experience implementation](operations/impressive-experience-implementation.md) — visual redesign summary and remaining native validation.

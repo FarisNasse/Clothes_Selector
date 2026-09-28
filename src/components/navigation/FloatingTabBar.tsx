@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import type { ComponentProps } from 'react';
 import type { Tabs } from 'expo-router';
 type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/components/primitives/AppText';
+import { BrandMark } from '@/components/brand/BrandMark';
 import { AnimatedPressable } from '@/components/motion/AnimatedPressable';
 import { useExperience } from '@/providers/ExperienceProvider';
+import { motion } from '@/design/motion';
 const icons: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
   index: ['sparkles-outline', 'sparkles'],
   wardrobe: ['shirt-outline', 'shirt'],
@@ -15,8 +18,13 @@ const icons: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionico
   profile: ['person-outline', 'person'],
 };
 export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const { colors: c } = useExperience();
+  const { colors: c, reducedMotion } = useExperience();
   const { width, fontScale } = useWindowDimensions();
+  const [barWidth, setBarWidth] = useState(0);
+  const selection = useSharedValue(state.index);
+  useEffect(() => { selection.value = withTiming(state.index, { duration: reducedMotion ? 0 : motion.navigation.duration }); }, [state.index, reducedMotion, selection]);
+  const itemWidth = barWidth ? (barWidth - 14 - 4 * (state.routes.length - 1)) / state.routes.length : 0;
+  const indicator = useAnimatedStyle(() => ({ transform: [{ translateX: selection.value * (itemWidth + 4) }] }));
   const insets = useSafeAreaInsets();
   const [keyboard, setKeyboard] = useState(false);
   useEffect(() => {
@@ -51,7 +59,9 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
           flexDirection: 'row',
           gap: 4,
         }}
+        onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
       >
+        {barWidth ? <Animated.View pointerEvents="none" style={[indicator, { position: 'absolute', top: 7, left: 7, bottom: 7, width: itemWidth, borderRadius: 25, backgroundColor: c.canvas.selected }]} /> : null}
         {state.routes.map((route, index) => {
           const active = index === state.index;
           const label = descriptors[route.key]?.options.title ?? route.name;
@@ -82,10 +92,10 @@ export function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarP
                 justifyContent: 'center',
                 gap: 3,
                 flexDirection: width > 700 && fontScale < 1.4 ? 'row' : 'column',
-                backgroundColor: active ? c.accent.forestMist : 'transparent',
+                backgroundColor: 'transparent',
               }}
             >
-              <Ionicons name={icon} color={active ? c.accent.forest : c.ink.secondary} size={20} />
+              {route.name === 'index' ? <BrandMark size={21} color={active ? c.accent.forest : c.ink.secondary} accent={c.accent.bronze} /> : <Ionicons name={icon} color={active ? c.accent.forest : c.ink.secondary} size={20} />}
               <AppText
                 variant="micro"
                 style={{

@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 import { OutfitPiece } from './OutfitPiece';
 import { compositionFor } from './composition';
 import { Entrance } from '@/components/motion/Entrance';
@@ -11,6 +12,7 @@ type Props = {
   lockedIds?: string[];
   onGarmentPress?: ((garment: Garment) => void) | undefined;
   label?: string;
+  tint?: string;
 };
 export function OutfitFlatLay({
   garments,
@@ -18,19 +20,21 @@ export function OutfitFlatLay({
   lockedIds = [],
   onGarmentPress,
   label = 'THE DAILY EDIT',
+  tint,
 }: Props) {
-  const { colors: c } = useExperience();
+  const { colors: c, reducedMotion } = useExperience();
   const positions = compositionFor(garments);
   return (
     <View
       style={{
         width: '100%',
-        aspectRatio: 0.95,
+        aspectRatio: 0.8,
         borderRadius: 28,
-        backgroundColor: c.canvas.sunken,
+        backgroundColor: c.canvas.media,
         overflow: 'hidden',
       }}
     >
+      <View pointerEvents="none" style={{ position: 'absolute', inset: 0, backgroundColor: tint ?? c.canvas.editorial, opacity: .2 }} />
       <View
         pointerEvents="none"
         style={{
@@ -56,8 +60,11 @@ export function OutfitFlatLay({
         const p = positions[item.id];
         if (!p) return null;
         return (
-          <View
+          <Animated.View
             key={item.id}
+            entering={FadeIn.duration(reducedMotion ? 0 : 280).reduceMotion(ReduceMotion.System)}
+            exiting={FadeOut.duration(reducedMotion ? 0 : 190).reduceMotion(ReduceMotion.System)}
+            layout={LinearTransition.duration(reducedMotion ? 0 : 290).reduceMotion(ReduceMotion.System)}
             style={{
               position: 'absolute',
               left: (p.left + '%') as `${number}%`,
@@ -68,14 +75,14 @@ export function OutfitFlatLay({
               transform: [{ rotate: p.rotation + 'deg' }],
             }}
           >
-            <Entrance delay={index * 40} style={{ flex: 1 }}>
+            <Entrance delay={index * 28} style={{ flex: 1 }}>
               <OutfitPiece
                 garment={item}
                 locked={lockedIds.includes(item.id) || lockedGarmentId === item.id}
                 onPress={onGarmentPress ? () => onGarmentPress(item) : undefined}
               />
             </Entrance>
-          </View>
+          </Animated.View>
         );
       })}
       <AppText

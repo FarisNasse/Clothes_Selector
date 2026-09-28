@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -28,6 +29,7 @@ type Props = {
   onSave?: () => void;
   saved?: boolean;
   countLabel?: string;
+  mood?: 'day' | 'rain' | 'evening';
 };
 export function RecommendationHero({
   recommendation,
@@ -46,13 +48,21 @@ export function RecommendationHero({
   onSave,
   saved = false,
   countLabel,
+  mood = 'day',
 }: Props) {
   const { width, fontScale } = useWindowDimensions();
   const { colors: c, reducedMotion } = useExperience();
   const wide = width >= 1000;
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const dominant = mood === 'rain' ? c.accent.navy : mood === 'evening' ? c.accent.burgundy : swatches[recommendation.garments[0]?.primaryColor.toLowerCase() ?? ''] ?? c.canvas.editorial;
   const x = useSharedValue(0);
+  const successScale = useSharedValue(1);
+  useEffect(() => {
+    if (wearSuccess && !reducedMotion) successScale.value = withSpring(0.98, motion.springSoft);
+    else successScale.value = withSpring(1, motion.springSoft);
+  }, [wearSuccess, reducedMotion, successScale]);
   const drag = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.value }, { rotate: x.value / 90 + 'deg' }],
+    transform: [{ translateX: x.value }, { rotate: x.value / 180 + 'deg' }, { scale: successScale.value }],
   }));
   const pan = Gesture.Pan()
     .enabled(canChange && !wearLoading && !reducedMotion)
@@ -71,13 +81,15 @@ export function RecommendationHero({
     });
   return (
     <View
-      style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 56 : 24, alignItems: 'stretch' }}
+      style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 52 : 14, alignItems: 'stretch' }}
     >
-      <View style={{ flex: wide ? 1.35 : undefined, minWidth: 0 }}>
+      <View style={{ flex: wide ? 1.6 : undefined, minWidth: 0 }}>
         <GestureDetector gesture={pan}>
-          <Animated.View style={drag}>
+          <Animated.View style={[drag, { shadowColor: '#17261C', shadowOpacity: .13, shadowRadius: 22, shadowOffset: { width: 0, height: 12 }, elevation: 5 }]}>
             <OutfitFlatLay
               garments={recommendation.garments}
+              tint={dominant}
+              label={contextLabel.toUpperCase()}
               lockedGarmentId={lockedGarmentId}
               lockedIds={lockedIds}
               onGarmentPress={onGarmentPress}
@@ -85,7 +97,7 @@ export function RecommendationHero({
           </Animated.View>
         </GestureDetector>
         <View
-          style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12 }}
+          style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }}
         >
           <AppText variant="metadata">
             {onGarmentPress ? 'Tap a piece. Make it yours.' : 'Selected from your wardrobe.'}
@@ -95,7 +107,7 @@ export function RecommendationHero({
           </AppText>
         </View>
       </View>
-      <View style={{ flex: wide ? 1 : undefined, minWidth: 0, justifyContent: 'center', gap: 22 }}>
+      <View style={{ flex: wide ? 1 : undefined, minWidth: 0, justifyContent: 'center', gap: wide ? 22 : 15 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <AppText variant="eyebrow" style={{ flex: 1 }}>
             {contextLabel}
@@ -109,16 +121,17 @@ export function RecommendationHero({
             />
           ) : null}
         </View>
-        <Entrance key={title}>
+        <Entrance>
           <AppText
             variant="displayXL"
             accessibilityRole="header"
-            style={{ fontSize: wide ? 52 : 40, lineHeight: wide ? 57 : 45 }}
+            style={{ fontSize: wide ? 54 : width < 380 ? 37 : 43, lineHeight: wide ? 61 : width < 380 ? 43 : 49 }}
           >
             {title}
           </AppText>
         </Entrance>
-        <View>
+        {!wide ? <Button label={detailsOpen ? 'Hide the pieces' : 'Pieces in this look'} variant="quiet" icon={detailsOpen ? 'chevron-up' : 'chevron-down'} onPress={() => setDetailsOpen(!detailsOpen)} /> : null}
+        {(wide || detailsOpen) ? <View>
           {recommendation.garments.map((item) => (
             <AnimatedPressable
               key={item.id}
@@ -158,7 +171,7 @@ export function RecommendationHero({
               </AppText>
             </AnimatedPressable>
           ))}
-        </View>
+        </View> : null}
         <View style={{ flexDirection: width < 380 || fontScale > 1.3 ? 'column' : 'row', gap: 10 }}>
           <View style={{ flex: 1.15 }}>
             <Button

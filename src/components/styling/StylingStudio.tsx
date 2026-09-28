@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
+import { useEffect } from 'react';
+import { Image } from 'expo-image';
 import { AppText } from '@/components/primitives/AppText';
 import { Button } from '@/components/primitives/Button';
 import { Chip } from '@/components/primitives/Chip';
@@ -51,6 +53,11 @@ export function StylingStudio({
   const recordingRef = useRef(false);
   const [worn, setWorn] = useState<string[]>([]);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  useEffect(() => {
+    const next = styling.recommendations.filter((item) => item.id !== recommendation?.id).slice(0, 1);
+    const urls = next.flatMap((item) => item.garments.map((garment) => garment.imageUrl).filter((url): url is string => Boolean(url)));
+    if (urls.length) void Image.prefetch(urls, 'memory-disk').catch(() => {});
+  }, [styling.recommendations, recommendation?.id]);
   function resetContext(nextOccasion: Occasion, nextWeather: WeatherContext) {
     setOccasion(nextOccasion);
     setWeather(nextWeather);
@@ -134,6 +141,7 @@ export function StylingStudio({
           recommendation={recommendation}
           title={anchor ? 'One piece.\nNew possibilities.' : lookTitles[occasion]}
           contextLabel={label + ' / your wardrobe'}
+          mood={weather.raining ? 'rain' : occasion === 'date' || occasion === 'dinner' ? 'evening' : 'day'}
           lockedIds={state.lockedIds}
           wearLoading={recording}
           wearSuccess={worn.includes(recommendation.id)}

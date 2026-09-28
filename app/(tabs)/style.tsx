@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { View, useWindowDimensions } from 'react-native';
+import { ScrollView, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { PageHeading } from '@/components/navigation/PageHeading';
@@ -8,6 +8,7 @@ import { Button } from '@/components/primitives/Button';
 import { Notice } from '@/components/primitives/Notice';
 import { OutfitSkeleton } from '@/components/primitives/Skeleton';
 import { GarmentTile } from '@/components/garment/GarmentTile';
+import { GarmentImage } from '@/components/garment/GarmentImage';
 import { PreferenceSheet } from '@/components/styling/PreferenceSheet';
 import { swatches } from '@/components/garment/GarmentIllustration';
 import { useWardrobe } from '@/providers/WardrobeProvider';
@@ -72,6 +73,9 @@ export default function StyleScreen() {
                   ? 'A direction shaped by your selected preferences. Room to try something unexpected.'
                   : 'Choose the fits and aesthetics you enjoy. Your next look starts there.'}
               </AppText>
+              {garments.length ? <View style={{ flexDirection: 'row', height: 112, gap: 7, overflow: 'hidden' }}>
+                {garments.slice(0, 4).map((item, index) => <View key={item.id} style={{ flex: 1, transform: [{ rotate: (index % 2 ? 3 : -3) + 'deg' }] }}><GarmentImage garment={item} variant="outfit" /></View>)}
+              </View> : null}
               <Button
                 label="Refine your style"
                 icon="options-outline"
@@ -90,16 +94,16 @@ export default function StyleScreen() {
               }}
             >
               <AppText variant="eyebrow">The colors you keep</AppText>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+              <View style={{ flexDirection: 'row', gap: 6, minHeight: 104 }}>
                 {summary.colors.map(([color, count]) => (
-                  <View key={color} style={{ gap: 8, width: 60, alignItems: 'center' }}>
+                  <View key={color} style={{ gap: 8, flex: Math.max(1, count), minWidth: 42 }}>
                     <View
                       accessibilityRole="image"
                       accessibilityLabel={color + ', ' + count + ' pieces'}
                       style={{
-                        width: 52,
-                        height: 52,
-                        borderRadius: 26,
+                        width: '100%',
+                        height: 70,
+                        borderRadius: 12,
                         backgroundColor: swatches[color] ?? c.ink.tertiary,
                         borderWidth: 1,
                         borderColor: c.border.strong,
@@ -112,6 +116,7 @@ export default function StyleScreen() {
                 ))}
               </View>
               <AppText variant="bodyLarge">{summary.description}</AppText>
+              {garments.length ? <View style={{ padding: 18, backgroundColor: c.canvas.editorial, borderRadius: 18, gap: 8 }}><AppText variant="eyebrow">YOUR SIGNATURE</AppText><AppText variant="bodyLarge">{summary.fit ? 'You reach for ' + summary.fit + ' silhouettes.' : 'Your wardrobe is taking shape.'}</AppText><AppText variant="metadata">{summary.colors[0] ? Math.round(summary.colors[0][1] / garments.length * 100) + '% of your pieces are ' + summary.colors[0][0] + '.' : ''}</AppText></View> : null}
               <AppText variant="metadata">
                 {garments.length
                   ? 'Drawn from ' + garments.length + ' pieces in your wardrobe.'
@@ -137,9 +142,9 @@ export default function StyleScreen() {
                 <AppText variant="title">Familiar pieces. Fresh possibilities.</AppText>
                 <AppText variant="muted">Build a look around something you wear less.</AppText>
               </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
                 {summary.rediscover.map((item) => (
-                  <View key={item.id} style={{ width: width < 700 ? '47%' : '31%' }}>
+                  <View key={item.id} style={{ width: width < 700 ? 175 : 240 }}>
                     <GarmentTile
                       garment={item}
                       onPress={() =>
@@ -154,7 +159,7 @@ export default function StyleScreen() {
                     </AppText>
                   </View>
                 ))}
-              </View>
+              </ScrollView>
             </View>
           ) : (
             <View style={{ marginTop: 24 }}>

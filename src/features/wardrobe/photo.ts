@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { env } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
 import { GarmentImageError, readPickedImage } from './pickedImage';
+import { normalizeWebPhoto } from './normalizeWebPhoto';
 
 export async function pickGarmentPhoto(source: 'camera' | 'library') {
   if (Platform.OS !== 'web') {
@@ -28,7 +29,12 @@ export async function pickGarmentPhoto(source: 'camera' | 'library') {
 export async function uploadGarmentPhoto(asset: ImagePicker.ImagePickerAsset, userId: string) {
   if (env.demoMode) return null;
   if (!supabase) throw new GarmentImageError('upload');
-  const { data, mimeType } = await readPickedImage(asset, Platform.OS === 'web');
+  if (Platform.OS === 'web' && asset.file && asset.file.size > 32 * 1024 * 1024)
+    throw new GarmentImageError('size');
+  const prepared = Platform.OS === 'web' && asset.file
+    ? { ...asset, file: await normalizeWebPhoto(asset.file) }
+    : asset;
+  const { data, mimeType } = await readPickedImage(prepared, Platform.OS === 'web');
   const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
   const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
   try {
