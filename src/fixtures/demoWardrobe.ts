@@ -14,7 +14,7 @@ export const demoStyleProfile: StyleProfile = {
   dislikedColors: ['neon green', 'hot pink'],
 };
 
-export const demoWardrobe: Garment[] = [
+const originalDemoWardrobe: Garment[] = [
   {
     id: 'g-navy-harrington',
     userId: demoUserId,
@@ -255,4 +255,67 @@ export const demoWardrobe: Garment[] = [
     lastWornAt: '2026-05-21T18:00:00.000Z',
     aiConfidence: 0.96,
   },
+];
+
+// Fictional, unbranded pieces enrich the sample closet; they are never added to a user's wardrobe.
+// [name, category, piece type, color, material, fit, formality, warmth, seasons, styles, pattern?, secondary colors?, waterproof?]
+type DemoSpec = [string, Garment['category'], string, string, string, Garment['fit'], number, number,
+  Garment['seasons'], string[], string?, string[]?, boolean?];
+const additionalPieces: DemoSpec[] = [
+  ['White Heavyweight Tee', 'top', 'Heavyweight T-shirt', 'white', 'cotton', 'regular', 2, 2, ['all-season'], ['minimalist', 'contemporary']],
+  ['Black Ribbed Tee', 'top', 'Crewneck T-shirt', 'black', 'cotton', 'slim', 2, 2, ['all-season'], ['minimalist']],
+  ['Sky Blue Linen Shirt', 'top', 'Linen shirt', 'sky blue', 'linen', 'relaxed', 5, 2, ['spring', 'summer'], ['italian', 'classic']],
+  ['Sage Camp Collar', 'top', 'Camp-collar shirt', 'sage', 'linen', 'relaxed', 4, 2, ['spring', 'summer'], ['contemporary']],
+  ['Blue Striped Oxford', 'top', 'Oxford shirt', 'light blue', 'cotton', 'regular', 6, 3, ['all-season'], ['classic', 'preppy'], 'stripe', ['white']],
+  ['Pink Poplin Shirt', 'top', 'Dress shirt', 'dusty pink', 'cotton', 'tailored', 7, 2, ['spring', 'summer'], ['classic']],
+  ['Black Merino Turtleneck', 'top', 'Turtleneck', 'black', 'wool', 'tailored', 7, 6, ['fall', 'winter'], ['minimalist', 'italian']],
+  ['Oatmeal Cashmere Crewneck', 'top', 'Crewneck sweater', 'cream', 'cashmere', 'regular', 5, 6, ['fall', 'winter'], ['classic', 'minimalist']],
+  ['Forest Green Cardigan', 'top', 'Cardigan', 'forest green', 'wool', 'relaxed', 5, 6, ['fall', 'winter'], ['classic']],
+  ['Burgundy Knit Polo', 'top', 'Knit polo', 'burgundy', 'cotton', 'tailored', 6, 4, ['spring', 'fall'], ['italian', 'contemporary']],
+  ['Stone Henley', 'top', 'Henley', 'stone', 'cotton', 'regular', 3, 4, ['all-season'], ['classic']],
+  ['Gray Flannel Shirt', 'top', 'Flannel shirt', 'gray', 'cotton', 'regular', 4, 5, ['fall', 'winter'], ['classic'], 'check', ['cream']],
+  ['Camel Wool Overcoat', 'outerwear', 'Wool overcoat', 'camel', 'wool', 'regular', 8, 9, ['fall', 'winter'], ['classic', 'italian']],
+  ['Olive Field Jacket', 'outerwear', 'Field jacket', 'olive', 'cotton', 'regular', 4, 6, ['spring', 'fall'], ['classic'], 'solid', [], true],
+  ['Stone Rain Shell', 'outerwear', 'Rain shell', 'stone', 'nylon', 'relaxed', 3, 5, ['spring', 'fall', 'winter'], ['contemporary'], 'solid', [], true],
+  ['Navy Unstructured Blazer', 'outerwear', 'Unstructured blazer', 'navy', 'wool', 'tailored', 7, 5, ['spring', 'fall'], ['italian', 'classic']],
+  ['Chocolate Corduroy Overshirt', 'outerwear', 'Overshirt', 'chocolate', 'corduroy', 'relaxed', 4, 6, ['fall', 'winter'], ['classic']],
+  ['Indigo Denim Jacket', 'outerwear', 'Denim jacket', 'indigo', 'denim', 'regular', 3, 5, ['spring', 'fall'], ['contemporary']],
+  ['Black Leather Jacket', 'outerwear', 'Leather jacket', 'black', 'leather', 'regular', 5, 6, ['fall', 'winter'], ['contemporary']],
+  ['Sand Linen Trousers', 'bottom', 'Linen trousers', 'sand', 'linen', 'relaxed', 5, 2, ['spring', 'summer'], ['italian', 'minimalist']],
+  ['Cream Pleated Trousers', 'bottom', 'Pleated trousers', 'cream', 'cotton', 'relaxed', 6, 4, ['spring', 'fall'], ['italian', 'classic']],
+  ['Olive Chinos', 'bottom', 'Chinos', 'olive', 'cotton', 'regular', 4, 4, ['all-season'], ['classic']],
+  ['Tan Chinos', 'bottom', 'Chinos', 'tan', 'cotton', 'regular', 4, 3, ['all-season'], ['classic', 'preppy']],
+  ['Black Wide-leg Trousers', 'bottom', 'Pleated trousers', 'black', 'wool', 'relaxed', 7, 5, ['spring', 'fall', 'winter'], ['contemporary']],
+  ['Brown Corduroy Pants', 'bottom', 'Corduroy trousers', 'brown', 'corduroy', 'regular', 5, 7, ['fall', 'winter'], ['classic']],
+  ['Light Wash Relaxed Jeans', 'bottom', 'Relaxed jeans', 'light blue', 'denim', 'relaxed', 2, 3, ['spring', 'summer'], ['contemporary']],
+  ['Olive Cargo Pants', 'bottom', 'Cargo pants', 'olive', 'cotton', 'relaxed', 2, 4, ['all-season'], ['contemporary']],
+  ['Navy Tailored Shorts', 'bottom', 'Tailored shorts', 'navy', 'cotton', 'regular', 3, 1, ['summer'], ['classic']],
+  ['Stone Linen Shorts', 'bottom', 'Linen shorts', 'stone', 'linen', 'relaxed', 3, 1, ['summer'], ['italian']],
+  ['Dark Brown Derby Shoes', 'footwear', 'Derby shoes', 'chocolate', 'leather', 'regular', 8, 4, ['all-season'], ['classic'], 'solid', [], true],
+  ['Black Oxford Shoes', 'footwear', 'Oxford shoes', 'black', 'leather', 'regular', 9, 4, ['all-season'], ['classic'], 'solid', [], true],
+  ['Cognac Penny Loafers', 'footwear', 'Penny loafers', 'cognac', 'leather', 'regular', 6, 2, ['spring', 'summer', 'fall'], ['italian', 'classic']],
+  ['Sand Chukka Boots', 'footwear', 'Chukka boots', 'sand', 'suede', 'regular', 5, 4, ['spring', 'fall'], ['classic']],
+  ['Black Weatherproof Boots', 'footwear', 'Service boots', 'black', 'leather', 'regular', 5, 7, ['fall', 'winter'], ['contemporary'], 'solid', [], true],
+  ['Navy Canvas Sneakers', 'footwear', 'Canvas sneakers', 'navy', 'canvas', 'regular', 2, 2, ['spring', 'summer'], ['classic']],
+  ['Tan Leather Sandals', 'footwear', 'Sandals', 'tan', 'leather', 'regular', 2, 1, ['summer'], ['minimalist']],
+  ['Charcoal Wool Suit', 'suit', 'Two-piece suit', 'charcoal', 'wool', 'tailored', 9, 6, ['all-season'], ['classic']],
+  ['Navy Linen Suit', 'suit', 'Linen suit', 'navy', 'linen', 'relaxed', 8, 3, ['spring', 'summer'], ['italian']],
+  ['Brown Leather Belt', 'accessory', 'Leather belt', 'brown', 'leather', 'regular', 6, 2, ['all-season'], ['classic']],
+  ['Black Leather Belt', 'accessory', 'Leather belt', 'black', 'leather', 'regular', 7, 2, ['all-season'], ['classic']],
+  ['Burgundy Silk Tie', 'accessory', 'Tie', 'burgundy', 'silk', 'regular', 9, 1, ['all-season'], ['classic']],
+  ['Navy Silk Pocket Square', 'accessory', 'Pocket square', 'navy', 'silk', 'regular', 8, 1, ['all-season'], ['classic'], 'paisley', ['cream']],
+  ['Camel Cashmere Scarf', 'accessory', 'Scarf', 'camel', 'cashmere', 'regular', 6, 7, ['fall', 'winter'], ['classic']],
+];
+
+export const demoWardrobe: Garment[] = [
+  ...originalDemoWardrobe,
+  ...additionalPieces.map(([name, category, subcategory, primaryColor, material, fit, formality,
+    warmth, seasons, styleTags, pattern = 'solid', secondaryColors = [], waterproof = false], index): Garment => ({
+    id: `demo-expanded-${index + 1}`,
+    userId: demoUserId,
+    category, subcategory, name, brand: null, primaryColor, secondaryColors, pattern,
+    materials: [material], fit, formality, warmth, waterproof, seasons, styleTags,
+    imageUrl: null, storagePath: null, purchasePrice: null, wearCount: 0,
+    lastWornAt: null, aiConfidence: null,
+  })),
 ];

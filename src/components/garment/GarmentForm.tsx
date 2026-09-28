@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { AppText } from '@/components/primitives/AppText';
 import { Button } from '@/components/primitives/Button';
@@ -6,10 +6,12 @@ import { Chip } from '@/components/primitives/Chip';
 import { IconButton } from '@/components/primitives/IconButton';
 import { TextField } from '@/components/primitives/TextField';
 import { parseLabels } from '@/features/wardrobe/validation';
+import { colorGroups, garmentTypes } from '@/features/wardrobe/catalog';
 import { garmentCategories, type Fit, type GarmentDraft, type Season } from '@/types/domain';
 const fits: Fit[] = ['slim', 'tailored', 'regular', 'relaxed', 'oversized'];
 const seasons: Season[] = ['spring', 'summer', 'fall', 'winter', 'all-season'];
-const colors = ['black', 'white', 'cream', 'navy', 'blue', 'brown', 'olive', 'gray', 'beige'];
+const patterns = ['solid', 'stripe', 'pinstripe', 'check', 'plaid', 'houndstooth', 'herringbone', 'floral', 'graphic'];
+const materials = ['cotton', 'linen', 'wool', 'cashmere', 'silk', 'denim', 'leather', 'suede', 'corduroy', 'nylon'];
 type Props = { value: GarmentDraft; onChange: (next: GarmentDraft) => void; disabled?: boolean; step?: 'all' | 'essentials' | 'details' };
 export function GarmentForm({ value, onChange, disabled = false, step = 'all' }: Props) {
   const [advanced, setAdvanced] = useState(false);
@@ -35,7 +37,7 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
               key={category}
               label={category === 'footwear' ? 'Shoes' : category}
               selected={value.category === category}
-              onPress={disabled ? undefined : () => update('category', category)}
+              onPress={disabled ? undefined : () => onChange({ ...value, category, subcategory: '' })}
             />
           ))}
         </View>
@@ -48,18 +50,30 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
         editable={!disabled}
         onChangeText={(text) => update('subcategory', text)}
       />
+      {value.category ? (
+        <View style={{ gap: 8 }}>
+          <AppText variant="metadata">Popular piece types</AppText>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {garmentTypes[value.category].map((type) => (
+              <Chip key={type} label={type} selected={value.subcategory === type}
+                onPress={disabled ? undefined : () => update('subcategory', type)} />
+            ))}
+          </View>
+        </View>
+      ) : null}
       <View style={{ gap: 10 }}>
         <AppText variant="eyebrow">Color</AppText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {colors.map((color) => (
-            <Chip
-              key={color}
-              label={color}
-              selected={value.primaryColor.toLowerCase() === color}
-              onPress={disabled ? undefined : () => update('primaryColor', color)}
-            />
-          ))}
-        </View>
+        {colorGroups.map((group) => (
+          <View key={group.label} style={{ gap: 6 }}>
+            <AppText variant="metadata">{group.label}</AppText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {group.colors.map((color) => (
+                <Chip key={color} label={color} selected={value.primaryColor.toLowerCase() === color}
+                  onPress={disabled ? undefined : () => update('primaryColor', color)} />
+              ))}
+            </View>
+          </View>
+        ))}
         <TextField
           label="Primary color · required"
           placeholder="e.g. light blue"
@@ -162,6 +176,21 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
             editable={!disabled}
             onChangeText={(text) => update('pattern', text)}
           />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {patterns.map((pattern) => (
+              <Chip key={pattern} label={pattern} selected={value.pattern === pattern}
+                onPress={disabled ? undefined : () => update('pattern', pattern)} />
+            ))}
+          </View>
+          <AppText variant="metadata">Materials · select several or type your own below</AppText>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {materials.map((material) => (
+              <Chip key={material} label={material} selected={value.materials.includes(material)}
+                onPress={disabled ? undefined : () => update('materials', value.materials.includes(material)
+                  ? value.materials.filter((item) => item !== material)
+                  : [...value.materials, material].slice(0, 6))} />
+            ))}
+          </View>
           <LabelsField
             label="Materials · separate with commas"
             values={value.materials}
@@ -244,6 +273,10 @@ function LabelsField({
   disabled: boolean;
 }) {
   const [raw, setRaw] = useState(values.join(', '));
+  const joined = values.join(', ');
+  useEffect(() => {
+    setRaw((current) => parseLabels(current).join(', ') === joined ? current : joined);
+  }, [joined]); // Only sync when an external chip or a different garment changes the values.
   return (
     <TextField
       label={label}

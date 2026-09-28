@@ -5,6 +5,7 @@ import { GarmentIllustration } from './GarmentIllustration';
 import { useExperience } from '@/providers/ExperienceProvider';
 import type { Garment } from '@/types/domain';
 import { swatches } from './GarmentIllustration';
+import { canonicalColor } from '@/features/wardrobe/catalog';
 
 export type GarmentImageVariant = 'grid' | 'hero' | 'outfit' | 'thumbnail' | 'capture' | 'preview';
 type Props = {
@@ -26,7 +27,7 @@ export function GarmentImage({ garment, variant = 'grid', style }: Props) {
       style={[
         styles.base,
         styles[variant],
-        { backgroundColor: variant === 'outfit' ? 'transparent' : variant === 'hero' ? (swatches[garment.primaryColor.toLowerCase()] ?? c.canvas.media) + '25' : c.canvas.media },
+        { backgroundColor: variant === 'outfit' ? 'transparent' : variant === 'hero' ? (swatches[canonicalColor(garment.primaryColor)] ?? c.canvas.media) + '25' : c.canvas.media },
         style,
       ]}
     >

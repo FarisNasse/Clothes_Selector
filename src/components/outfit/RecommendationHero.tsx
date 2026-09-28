@@ -11,6 +11,7 @@ import { Entrance } from '@/components/motion/Entrance';
 import { useExperience } from '@/providers/ExperienceProvider';
 import { motion } from '@/design/motion';
 import { swatches } from '@/components/garment/GarmentIllustration';
+import { canonicalColor } from '@/features/wardrobe/catalog';
 import type { Garment, OutfitRecommendation } from '@/types/domain';
 type Props = {
   recommendation: OutfitRecommendation;
@@ -54,7 +55,7 @@ export function RecommendationHero({
   const { colors: c, reducedMotion } = useExperience();
   const wide = width >= 1000;
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const dominant = mood === 'rain' ? c.accent.navy : mood === 'evening' ? c.accent.burgundy : swatches[recommendation.garments[0]?.primaryColor.toLowerCase() ?? ''] ?? c.canvas.editorial;
+  const dominant = mood === 'rain' ? c.accent.navy : mood === 'evening' ? c.accent.burgundy : swatches[canonicalColor(recommendation.garments[0]?.primaryColor ?? '')] ?? c.canvas.editorial;
   const x = useSharedValue(0);
   const successScale = useSharedValue(1);
   useEffect(() => {
@@ -154,7 +155,7 @@ export function RecommendationHero({
                   width: 9,
                   height: 9,
                   borderRadius: 5,
-                  backgroundColor: swatches[item.primaryColor.toLowerCase()] ?? c.ink.tertiary,
+                  backgroundColor: swatches[canonicalColor(item.primaryColor)] ?? c.ink.tertiary,
                   borderWidth: 1,
                   borderColor: c.border.strong,
                 }}

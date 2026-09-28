@@ -1,33 +1,16 @@
 import { useId } from 'react';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import type { Garment } from '@/types/domain';
+import { canonicalColor, colorSwatches } from '@/features/wardrobe/catalog';
 
-export const swatches: Record<string, string> = {
-  navy: '#304356',
-  cream: '#DFD2B9',
-  white: '#F5F2E9',
-  charcoal: '#515651',
-  indigo: '#344A62',
-  brown: '#79573E',
-  black: '#2B2F2C',
-  olive: '#73785B',
-  grey: '#8B8D85',
-  gray: '#8B8D85',
-  beige: '#C5B399',
-  blue: '#7696AC',
-  burgundy: '#754A50',
-  green: '#627763',
-  red: '#AD5850',
-  pink: '#C9938F',
-  stone: '#BEB8A8',
-};
+export const swatches = colorSwatches;
 export function GarmentIllustration({
   garment,
 }: {
   garment: Pick<Garment, 'category' | 'primaryColor' | 'subcategory'>;
 }) {
   const id = useId().replace(/:/g, '');
-  const tone = swatches[garment.primaryColor.toLowerCase()] ?? '#A19B8E';
+  const tone = swatches[canonicalColor(garment.primaryColor)] ?? '#A19B8E';
   const shade = 'rgba(18,26,22,0.24)';
   const shirt = /shirt|oxford/i.test(garment.subcategory);
   const boot = /boot|chelsea/i.test(garment.subcategory);
