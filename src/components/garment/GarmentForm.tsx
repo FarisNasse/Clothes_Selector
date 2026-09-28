@@ -19,21 +19,15 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
   return (
     <View style={{ gap: 24 }}>
       <TextField
-        label="Name"
+        label="Name · required"
+        placeholder="e.g. Light blue Oxford shirt"
         value={value.name}
         maxLength={120}
         editable={!disabled}
         onChangeText={(text) => update('name', text)}
       />
-      <TextField
-        label="Brand · optional"
-        value={value.brand ?? ''}
-        maxLength={80}
-        editable={!disabled}
-        onChangeText={(text) => update('brand', text || null)}
-      />
       <View style={{ gap: 10 }}>
-        <AppText variant="eyebrow">Category</AppText>
+        <AppText variant="eyebrow">Category · required</AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {garmentCategories.map((category) => (
             <Chip
@@ -46,7 +40,8 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
         </View>
       </View>
       <TextField
-        label="Piece type"
+        label="Piece type · required"
+        placeholder="e.g. Oxford shirt"
         value={value.subcategory}
         maxLength={80}
         editable={!disabled}
@@ -65,7 +60,8 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
           ))}
         </View>
         <TextField
-          label="Exact color"
+          label="Primary color · required"
+          placeholder="e.g. light blue"
           value={value.primaryColor}
           maxLength={40}
           editable={!disabled}
@@ -73,7 +69,7 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
         />
       </View>
       <View style={{ gap: 10 }}>
-        <AppText variant="eyebrow">Fit</AppText>
+        <AppText variant="eyebrow">Fit · starts at regular; check this value</AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {fits.map((fit) => (
             <Chip
@@ -86,7 +82,7 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
         </View>
       </View>
       <Rating
-        label="Dressiness"
+        label="Dressiness · starts at 5"
         value={value.formality}
         low="Everyday"
         high="Formal"
@@ -94,7 +90,7 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
         onChange={(number) => update('formality', number)}
       />
       <Rating
-        label="Warmth"
+        label="Warmth · starts at 5"
         value={value.warmth}
         low="Light"
         high="Cozy"
@@ -149,6 +145,13 @@ export function GarmentForm({ value, onChange, disabled = false }: Props) {
       />
       {advanced ? (
         <View style={{ gap: 20 }}>
+          <TextField
+            label="Brand · optional"
+            value={value.brand ?? ''}
+            maxLength={80}
+            editable={!disabled}
+            onChangeText={(text) => update('brand', text || null)}
+          />
           <TextField
             label="Pattern"
             value={value.pattern}

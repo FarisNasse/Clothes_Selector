@@ -4,6 +4,8 @@
 
 - [ ] Signup, verification, login, logout, recovery tested on iOS and Android
 - [ ] 30-item wardrobe ingestion test completed without developer intervention
+- [ ] No-photo and optional-photo add/edit flows tested on web and Android with a staging account
+- [ ] Photo error, retry, replace, remove, cancel, and save-without-photo paths tested
 - [ ] Garment edit/delete implemented
 - [ ] Image rendering uses private signed access
 - [ ] Recommendation generation always uses owned inventory
@@ -12,33 +14,27 @@
 - [ ] Wear event persisted and updates garment wear counters safely
 - [ ] Feedback reasons persisted
 
-## AI quality
+## Recommendation quality
 
-- [ ] Curated garment-image evaluation set created
-- [ ] Category accuracy target defined and met
-- [ ] Color extraction target defined and met
-- [ ] Confidence calibration reviewed
-- [ ] Low-confidence correction path tested
-- [ ] Model version logged with analysis metadata
-- [ ] Cost per analyzed garment monitored
-- [ ] Rate limiting / budget protection enabled
+- [ ] Manual details for a full top/bottom/footwear set produce suitable looks
+- [ ] Color, fit, and formality changes affect ranking as expected
+- [ ] New-item network inspection shows no analysis or AI request
 
 ## Data & security
 
 - [ ] RLS tests run with two independent users
 - [ ] Storage cross-user access tests pass
-- [ ] Service-role and OpenAI keys absent from client bundle
+- [ ] Service-role keys absent from client bundle
 - [ ] Account deletion removes database rows
 - [ ] Account deletion removes private storage objects
 - [ ] Data export path defined
 - [ ] Privacy policy reviewed
-- [ ] AI-provider data controls reviewed
 - [ ] Logs scrub secrets, auth headers, and signed URLs
 
 ## Reliability
 
 - [ ] Observability/crash reporting configured
-- [ ] Edge Function errors observable
+- [ ] Storage and database errors observable
 - [ ] Offline/timeout states implemented
 - [ ] Upload retries are idempotent
 - [ ] Database migration rehearsed in staging

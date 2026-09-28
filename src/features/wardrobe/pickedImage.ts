@@ -4,7 +4,7 @@ import { decode } from 'base64-arraybuffer';
 export const MAX_GARMENT_IMAGE_BYTES = 12 * 1024 * 1024;
 
 export class GarmentImageError extends Error {
-  constructor(public readonly kind: 'read' | 'size' | 'format' | 'upload' | 'analysis', cause?: unknown) {
+  constructor(public readonly kind: 'read' | 'size' | 'format' | 'upload', cause?: unknown) {
     super(kind, { cause });
     this.name = 'GarmentImageError';
   }
@@ -30,8 +30,8 @@ export async function readPickedImage(asset: ImagePickerAsset, isWeb: boolean) {
         throw new GarmentImageError('size');
       data = asset.file ? await asset.file.arrayBuffer() : await (await fetch(asset.uri)).arrayBuffer();
     } else {
-      // Expo supplies JPEG data even when the selected native photo is HEIC/AVIF.
-      // Fetching a file:// or content:// URI is not reliable in React Native.
+      // Expo can supply converted JPEG bytes for HEIC; inspect the bytes, not the filename.
+      // A device that does not supply base64 needs a new selection.
       if (!asset.base64) throw new GarmentImageError('read');
       data = decode(asset.base64);
     }
@@ -44,4 +44,15 @@ export async function readPickedImage(asset: ImagePickerAsset, isWeb: boolean) {
   const mimeType = imageMime(new Uint8Array(data, 0, Math.min(data.byteLength, 12)));
   if (!mimeType) throw new GarmentImageError('format');
   return { data, mimeType };
+}
+
+export function photoErrorMessage(failure: unknown) {
+  if (!(failure instanceof GarmentImageError))
+    return 'Could not open or upload the photo. Check your connection and try again.';
+  switch (failure.kind) {
+    case 'size': return 'This photo is over 12 MB. Choose a smaller photo, or save without it.';
+    case 'format': return 'This photo format cannot be uploaded. Choose or export a JPEG, PNG, or WebP image.';
+    case 'read': return 'We could not read this photo. Choose another or export it as a JPEG.';
+    case 'upload': return 'We could not upload the photo. Check your connection and sign-in, then retry.';
+  }
 }

@@ -1,3 +1,7 @@
+# Product proposal (historical concept)
+
+The AI photo-classification concepts below describe an earlier proposal. The current app uses manual garment entry, optional private photos, and deterministic outfit recommendations without an AI API. See `README.md` for current behavior.
+
 # Clothes Selector — Product Proposal
 
 ## Executive summary

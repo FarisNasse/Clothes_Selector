@@ -1,11 +1,19 @@
 import { z } from 'zod';
-import { garmentAnalysisSchema } from './analysisSchema';
-export const garmentDraftSchema = garmentAnalysisSchema.omit({ confidence: true }).extend({
-  // Manual entries can have no style tags without inventing one.
-  styleTags: z.array(z.string().max(40)).max(8),
-  name: z.string().trim().min(1).max(120),
+export const garmentDraftSchema = z.object({
+  category: z.enum(['top', 'bottom', 'outerwear', 'footwear', 'accessory', 'suit']),
   subcategory: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(120),
+  brand: z.string().trim().max(80).nullable(),
   primaryColor: z.string().trim().min(1).max(40),
+  secondaryColors: z.array(z.string().max(40)).max(5),
+  pattern: z.string().trim().min(1).max(40),
+  materials: z.array(z.string().max(50)).max(6),
+  fit: z.enum(['slim', 'tailored', 'regular', 'relaxed', 'oversized']),
+  formality: z.number().int().min(1).max(10),
+  warmth: z.number().int().min(1).max(10),
+  waterproof: z.boolean(),
+  seasons: z.array(z.enum(['spring', 'summer', 'fall', 'winter', 'all-season'])).min(1).max(5),
+  styleTags: z.array(z.string().max(40)).max(8),
   imageUrl: z.string().nullable(),
   storagePath: z.string().nullable(),
   purchasePrice: z.number().finite().nonnegative().nullable(),

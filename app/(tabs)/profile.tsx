@@ -202,8 +202,8 @@ export default function ProfileScreen() {
         </AppText>
         <AppText variant="muted">
           {isDemo
-            ? 'Demo analysis returns sample details without uploading your photo.'
-            : 'When you add a photo, it is uploaded to your private wardrobe and sent for garment analysis. You review the suggested details before saving.'}
+            ? 'Demo additions and photos stay in this app session.'
+            : 'You enter garment details yourself. A photo is optional and is stored privately with your wardrobe; it is not sent to an AI service.'}
         </AppText>
         <AppText variant="bodyLarge">What stays on this device</AppText>
         <AppText variant="muted">

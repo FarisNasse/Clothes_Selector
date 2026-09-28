@@ -1,5 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { Image } from 'expo-image';
+import type { ImagePickerAsset } from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Screen } from '@/components/Screen';
 import { PageHeading } from '@/components/navigation/PageHeading';
@@ -12,8 +14,12 @@ import { Notice } from '@/components/primitives/Notice';
 import { OutfitSkeleton } from '@/components/primitives/Skeleton';
 import { garmentToDraft } from '@/features/wardrobe/draft';
 import { garmentDraftSchema } from '@/features/wardrobe/validation';
+import { photoErrorMessage } from '@/features/wardrobe/pickedImage';
+import { pickGarmentPhoto, uploadGarmentPhoto } from '@/features/wardrobe/photo';
+import { discardStagedGarmentImage } from '@/features/wardrobe/stagedImage';
 import { useWardrobe } from '@/providers/WardrobeProvider';
 import { useExperience } from '@/providers/ExperienceProvider';
+import { useSession } from '@/providers/SessionProvider';
 import type { Garment } from '@/types/domain';
 export default function EditGarmentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,12 +47,66 @@ export default function EditGarmentScreen() {
 function GarmentEditor({ garment }: { garment: Garment }) {
   const { editGarment, removeGarment } = useWardrobe();
   const { haptic } = useExperience();
+  const { session, isDemo } = useSession();
   const [draft, setDraft] = useState(() => garmentToDraft(garment));
-  const [busy, setBusy] = useState<'save' | 'delete' | null>(null);
+  const [asset, setAsset] = useState<ImagePickerAsset | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'pick' | 'save' | 'delete' | null>(null);
   const busyRef = useRef(false);
+  const saving = useRef(false);
+  const active = useRef(true);
+  const unused = useRef(new Set<string>());
+  const uploaded = useRef<{ uri: string; path: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
-  async function save() {
+  async function discard(path: string) {
+    try {
+      await discardStagedGarmentImage(path);
+      unused.current.delete(path);
+    } catch {
+      console.warn('Could not discard an unused garment image.');
+    }
+  }
+  useEffect(() => {
+    active.current = true;
+    const paths = unused.current;
+    return () => {
+      active.current = false;
+      if (!saving.current)
+        for (const path of paths) discardStagedGarmentImage(path).catch(() => {});
+    };
+  }, []);
+  async function choose(source: 'camera' | 'library') {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy('pick');
+    setPhotoError(null);
+    try {
+      const selected = await pickGarmentPhoto(source);
+      if (!active.current || !selected) return;
+      if (uploaded.current) void discard(uploaded.current.path);
+      uploaded.current = null;
+      setAsset(selected);
+      setRemovePhoto(false);
+    } catch (failure) {
+      if (active.current)
+        setPhotoError(failure instanceof Error && failure.name !== 'GarmentImageError'
+          ? failure.message : photoErrorMessage(failure));
+    } finally {
+      busyRef.current = false;
+      if (active.current) setBusy(null);
+    }
+  }
+  function clearPhoto() {
+    if (busyRef.current) return;
+    if (uploaded.current) void discard(uploaded.current.path);
+    uploaded.current = null;
+    setAsset(null);
+    setRemovePhoto(true);
+    setPhotoError(null);
+  }
+  async function save(ignoreSelectedPhoto = false) {
     if (busyRef.current) return;
     const checked = garmentDraftSchema.safeParse(draft);
     if (!checked.success) {
@@ -58,18 +118,46 @@ function GarmentEditor({ garment }: { garment: Garment }) {
       return;
     }
     busyRef.current = true;
+    saving.current = true;
     setBusy('save');
     setError(null);
+    setPhotoError(null);
+    let updating = false;
     try {
-      await editGarment(garment.id, checked.data);
+      let path = removePhoto ? null : garment.storagePath;
+      if (asset && !ignoreSelectedPhoto) {
+        path = uploaded.current?.uri === asset.uri ? uploaded.current.path
+          : await uploadGarmentPhoto(asset, isDemo ? 'demo-user' : session?.user.id ?? '');
+        if (path && uploaded.current?.path !== path) {
+          unused.current.add(path);
+          uploaded.current = { uri: asset.uri, path };
+        }
+      }
+      if (!active.current) return;
+      updating = true;
+      await editGarment(garment.id, {
+        ...checked.data,
+        storagePath: path,
+        imageUrl: path === garment.storagePath ? garment.imageUrl : null,
+        aiConfidence: null,
+      });
+      if (path) unused.current.delete(path);
+      if (garment.storagePath && garment.storagePath !== path) void discard(garment.storagePath);
+      if (uploaded.current && uploaded.current.path !== path) void discard(uploaded.current.path);
+      uploaded.current = null;
       haptic('success');
       if (router.canGoBack()) router.back();
       else router.replace({ pathname: '/garment/[id]', params: { id: garment.id } });
-    } catch {
-      setError('We could not save these changes. Please try again.');
+    } catch (failure) {
+      if (active.current) {
+        if (!updating && asset && !ignoreSelectedPhoto) setPhotoError(photoErrorMessage(failure));
+        else setError('We could not save these changes. Your details are still here; please try again.');
+      }
     } finally {
       busyRef.current = false;
-      setBusy(null);
+      saving.current = false;
+      if (active.current) setBusy(null);
+      else for (const path of unused.current) await discard(path);
     }
   }
   async function remove() {
@@ -91,14 +179,37 @@ function GarmentEditor({ garment }: { garment: Garment }) {
   return (
     <Screen maxWidth={760}>
       <PageHeading eyebrow="The details" title="A little refinement." detail={garment.name} />
+      <View style={{ gap: 12, marginBottom: 24 }}>
+        <AppText variant="eyebrow">PHOTO · OPTIONAL</AppText>
+        {asset || (!removePhoto && garment.imageUrl) ? (
+          <Image source={{ uri: asset?.uri ?? garment.imageUrl! }} contentFit="contain"
+            style={{ width: '100%', height: 240, borderRadius: 20 }} />
+        ) : <AppText variant="muted">This piece has no photo. You can add one at any time.</AppText>}
+        <Button label="Take photo" variant="secondary" disabled={Boolean(busy)}
+          onPress={() => choose('camera')} />
+        <Button label="Choose photo" variant="secondary" disabled={Boolean(busy)}
+          onPress={() => choose('library')} />
+        {asset || (!removePhoto && garment.storagePath) ? (
+          <Button label="Remove photo" variant="quiet" disabled={Boolean(busy)} onPress={clearPhoto} />
+        ) : null}
+        {photoError ? (
+          <View style={{ gap: 10 }}>
+            <Notice message={photoError} tone="error" />
+            <Button label="Retry photo" variant="secondary" disabled={Boolean(busy)}
+              onPress={() => save()} />
+            <Button label={garment.storagePath ? 'Save without new photo' : 'Save without photo'}
+              variant="quiet" disabled={Boolean(busy)} onPress={() => save(true)} />
+          </View>
+        ) : null}
+      </View>
       <GarmentForm value={draft} onChange={setDraft} disabled={Boolean(busy)} />
       <View style={{ marginTop: 28, gap: 12 }}>
         {error && !confirm ? <Notice message={error} tone="error" /> : null}
         <Button
           label="Save changes"
           loading={busy === 'save'}
-          disabled={busy === 'delete'}
-          onPress={save}
+          disabled={Boolean(busy) && busy !== 'save'}
+          onPress={() => save()}
         />
         <Button
           label="Delete garment"

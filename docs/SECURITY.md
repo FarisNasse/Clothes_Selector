@@ -23,10 +23,9 @@ Allowed in the Expo bundle:
 Never bundle:
 
 - Supabase service-role key
-- OpenAI API key
 - third-party server secret
 
-All server secrets belong in Edge Function/runtime secret storage.
+No AI service key is needed for garment entry or outfit recommendations.
 
 ## Database isolation
 
@@ -42,27 +41,21 @@ The `garment-images` bucket is private. Paths are user-rooted and policies requi
 (storage.foldername(name))[1] = auth.uid()::text
 ```
 
-The analysis Edge Function creates only short-lived signed URLs under the caller's authenticated Supabase context.
-
-## AI data flow
-
-The mobile app does not call OpenAI directly.
+Stored photos are displayed through short-lived signed URLs.
 
 ```text
-User photo → private Supabase Storage → short-lived signed URL → Edge Function → OpenAI
+Optional user photo → private Supabase Storage → signed URL for display
 ```
 
-The generated metadata is proposed, not silently accepted. A human confirmation step reduces classification errors becoming durable profile data.
+Garment metadata is entered and reviewed by the user. There is no AI data flow in garment entry.
 
 ## Required pre-beta security work
 
 - automated RLS isolation tests using two distinct users
-- rate limit garment-analysis calls
 - reject unsupported image content types and oversized payloads
 - strip unnecessary image metadata where practical
-- add abuse/cost monitoring
+- add storage abuse/cost monitoring
 - verify account deletion removes database rows and storage objects
 - create privacy policy and user-facing data-retention controls
-- define AI/provider data retention settings
 - verify logs never include signed image URLs, authorization headers, or secrets
 - dependency and secret scanning in CI

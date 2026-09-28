@@ -16,8 +16,7 @@ This repository starts with a proposal-ready vertical foundation rather than an 
 - Supabase Auth/session boundary and live-data repository path
 - production database schema with user-scoped Row Level Security
 - private garment-image Storage policies
-- camera / photo-library garment ingestion
-- server-side garment analysis boundary using the OpenAI Responses API
+- manual garment entry with an optional camera / photo-library image
 - strict structured garment metadata schema
 - deterministic outfit candidate generation and scoring
 - locked-garment “Style This” flow in the UI and recommendation engine
@@ -32,11 +31,9 @@ The demo mode is intentional: it lets the product be presented immediately while
 ## Product loop
 
 ```text
-Photograph garment
+Enter garment details (optional photo)
       ↓
-AI proposes structured metadata
-      ↓
-User confirms/corrects
+Review fit, dressiness, and warmth
       ↓
 Garment enters authoritative wardrobe
       ↓
@@ -49,7 +46,7 @@ User swaps / saves / wears
 Behavior becomes personalization data
 ```
 
-The system never asks a model to invent a wardrobe. Candidate outfits are assembled exclusively from stored garments. AI is used for perception, interpretation, reranking/explanation, and later personalization—not as a substitute for inventory integrity.
+Candidate outfits are assembled exclusively from stored garments and ranked locally with deterministic rules. Adding a garment or generating an outfit makes no AI request.
 
 ## Quick start: proposal/demo mode
 
@@ -61,7 +58,7 @@ npm install
 npm start
 ```
 
-Leave `EXPO_PUBLIC_DEMO_MODE=true` to present the application without Supabase or AI credentials.
+Leave `EXPO_PUBLIC_DEMO_MODE=true` to present the application without Supabase credentials.
 Edit `.env`, not `.env.example`; Expo reads `.env` when it starts. If `.env` is missing,
 the app defaults to demo mode. After changing the flag, restart Expo with `npx expo start --clear`.
 
@@ -76,7 +73,7 @@ npx expo start --clear --web
 
 The repair script runs Expo's installer for `react-dom`, `react-native-web`, and `@expo/metro-runtime`, then runs `expo install --fix` and Expo Doctor. This keeps the exact versions tied to the project's installed Expo SDK instead of hard-coding them in this patch.
 
-The demo contains a seeded menswear wardrobe and a deterministic recommendation engine. The Add Garment flow uses a clearly disclosed sample classification in demo mode so the full interaction can be shown safely without external calls.
+The demo contains a seeded menswear wardrobe and a deterministic recommendation engine. Manual additions in demo mode last for the app session.
 
 ## Connected mode
 
@@ -91,26 +88,14 @@ EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
 
-5. Set Edge Function secrets server-side:
+No AI key or Edge Function deployment is needed. Never put a Supabase service-role key in an `EXPO_PUBLIC_*` variable.
 
-```bash
-supabase secrets set OPENAI_API_KEY=...
-supabase secrets set OPENAI_GARMENT_MODEL=gpt-5.6
-```
+### Manual entry and optional photo
 
-6. Deploy the function:
-
-```bash
-supabase functions deploy analyze-garment
-```
-
-Never put `OPENAI_API_KEY` or a Supabase service-role key in an `EXPO_PUBLIC_*` variable. Expo public values are bundled into the client application.
-
-### Photo upload and API fallback
-
-- Demo mode accepts a selected photo without uploading it or calling the API; it shows clearly labeled sample details and stores additions for the current session only.
-- Connected mode requires a signed-in user, the `garment-images` Storage bucket and policies, and the `garments` database table. After a successful photo upload, an OpenAI or Edge Function failure opens manual entry. Fill in name, piece type, and color, check the other defaults, then save the actual uploaded photo and garment. No OpenAI credits are needed for manual entry.
-- If the photo cannot be read or uploaded, the app reports a read, format, size, or upload error. Manual entry cannot save an image that never reached Storage. Inspect Storage policies and your session for upload errors; inspect Edge Function logs for analysis errors.
+- Enter a category, piece type, name, and primary color; review the visible fit, dressiness, and warmth values. Save without a photo or attach one from the camera/gallery.
+- In connected mode, photos upload to the private `garment-images` bucket after form validation. A read, format, size, or upload error leaves the details intact; retry, choose another image, or explicitly save without one. JPEG, PNG, and WebP bytes up to 12 MB are accepted. Some browser HEIC/AVIF selections must first be exported as JPEG.
+- In demo mode, additions and selected photo previews remain in the app session. They do not sync. Signed-in garments persist through Supabase with or without an image.
+- The add and edit flows make no `analyze-garment` or other AI request. If an older deployment exists, undeploy it and remove its OpenAI secrets after confirming no older app clients still use it.
 
 ## Validation
 

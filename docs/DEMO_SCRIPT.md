@@ -36,9 +36,9 @@ Explain that this database is the foundation for later cost-per-wear, wardrobe h
 
 Tap **+**.
 
-Take/select a garment photo. In proposal mode the app deliberately returns a deterministic demo classification so the flow works without external credentials.
+Enter a category, piece type, name, and color. Optionally take or select a photo.
 
-Show the confirmation surface:
+Show the manual details:
 
 - category
 - subcategory
@@ -47,9 +47,8 @@ Show the confirmation surface:
 - fit
 - formality
 - warmth
-- confidence
 
-Edit one field to demonstrate the principle: AI proposes; the user confirms.
+Adjust fit or dressiness to show that the user controls recommendation inputs.
 
 Save the garment and return to the wardrobe.
 
@@ -67,7 +66,7 @@ Emphasize that an actual wear event is a stronger signal than a like.
 
 Open **Profile**.
 
-Show the privacy surface and explain the server-side AI boundary and user-scoped data model.
+Show the privacy surface and explain private image storage and user-scoped data.
 
 Close with the north-star metric:
 

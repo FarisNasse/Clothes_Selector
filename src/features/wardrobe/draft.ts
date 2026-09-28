@@ -1,33 +1,9 @@
-import type { GarmentAnalysis } from '@/features/wardrobe/analysisSchema';
 import type { Garment, GarmentDraft } from '@/types/domain';
 
-export function analysisToDraft(analysis: GarmentAnalysis, storagePath: string | null): GarmentDraft {
-  return {
-    category: analysis.category,
-    subcategory: analysis.subcategory,
-    name: analysis.name,
-    brand: analysis.brand,
-    primaryColor: analysis.primaryColor,
-    secondaryColors: analysis.secondaryColors,
-    pattern: analysis.pattern,
-    materials: analysis.materials,
-    fit: analysis.fit,
-    formality: analysis.formality,
-    warmth: analysis.warmth,
-    waterproof: analysis.waterproof,
-    seasons: analysis.seasons,
-    styleTags: analysis.styleTags,
-    imageUrl: null,
-    storagePath,
-    purchasePrice: null,
-    aiConfidence: analysis.confidence,
-  };
-}
-
 // Required identifying fields stay empty until the user supplies real details.
-export function manualGarmentDraft(storagePath: string, imageUrl: string): GarmentDraft {
+export function manualGarmentDraft(): GarmentDraft {
   return {
-    category: 'top',
+    category: '' as GarmentDraft['category'],
     subcategory: '',
     name: '',
     brand: null,
@@ -41,8 +17,8 @@ export function manualGarmentDraft(storagePath: string, imageUrl: string): Garme
     waterproof: false,
     seasons: ['all-season'],
     styleTags: [],
-    imageUrl,
-    storagePath,
+    imageUrl: null,
+    storagePath: null,
     purchasePrice: null,
     aiConfidence: null,
   };

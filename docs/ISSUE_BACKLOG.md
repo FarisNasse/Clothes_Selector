@@ -1,3 +1,7 @@
+# Backlog (earlier proposal)
+
+Automatic garment-analysis items below are archived; the current production route is manual details with an optional photo.
+
 # Initial Engineering Backlog
 
 This backlog is ordered to keep the core wardrobe → recommendation → wear loop ahead of expansion features.

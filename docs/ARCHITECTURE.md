@@ -11,13 +11,13 @@ Maintain an authoritative, private representation of a user's wardrobe and gener
 Responsibilities:
 
 - authentication UX
-- garment photo capture
+- manual garment details and optional photo capture
 - wardrobe browsing and correction
 - recommendation presentation
 - feedback and wear actions
 - client-side validation
 
-The client never contains an OpenAI API key or Supabase service-role key.
+The client never contains a Supabase service-role key.
 
 ## Supabase
 
@@ -50,21 +50,7 @@ garment-images/<user-id>/<asset-id>.jpg
 
 Storage policies prevent users from reading or mutating another user's folder.
 
-### Edge Functions
-
-`analyze-garment` receives a storage path, validates the authenticated user, creates a short-lived signed image URL under that user's RLS context, and performs server-side multimodal classification.
-
-## AI boundary
-
-### Garment analysis
-
-Input:
-- authenticated private garment image
-
-Output:
-- strict JSON schema with category, color, pattern, materials, fit, formality, warmth, seasonality, style tags, and confidence
-
-The user confirms or corrects the output before it becomes authoritative wardrobe data.
+Garment entry saves user supplied details directly. A photo is optional; it is uploaded to private Storage only at save time. No Edge Function or AI service is used.
 
 ### Recommendation engine
 
@@ -84,11 +70,10 @@ The first-generation recommendation engine is deliberately deterministic and tes
 4. Sort and diversify the strongest results.
 5. Return approximately three options.
 
-Later, an AI reranker can operate **on the top valid candidates**, rather than inventing arbitrary outfits.
 
 ## Demo/live boundary
 
-`EXPO_PUBLIC_DEMO_MODE=true` uses deterministic fixture data and local demo classification. This exists so the product can be presented without external dependencies.
+`EXPO_PUBLIC_DEMO_MODE=true` uses deterministic fixture data and session-only manual additions.
 
 Connected mode uses:
 
@@ -96,8 +81,6 @@ Connected mode uses:
 Expo client
   → Supabase Auth
   → RLS-protected Postgres / Storage
-  → authenticated Edge Function
-  → OpenAI Responses API
 ```
 
 The screens and domain types are shared across both modes; demo mode is not a separate mock application.
@@ -109,8 +92,7 @@ Recommended next architectural steps:
 1. move recommendation-session persistence into a repository/service boundary
 2. add analytics event abstraction
 3. add weather provider behind an interface
-4. add AI candidate reranking server-side
-5. add feature flags / remote config
-6. add Sentry or equivalent observability
-7. add end-to-end Maestro flows
-8. add deletion/export jobs for privacy operations
+4. add feature flags / remote config
+5. add Sentry or equivalent observability
+6. add end-to-end Maestro flows
+7. add deletion/export jobs for privacy operations

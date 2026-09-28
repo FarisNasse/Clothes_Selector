@@ -22,6 +22,3 @@ enable_signup = true
 [storage]
 enabled = true
 file_size_limit = "12MiB"
-
-[functions.analyze-garment]
-verify_jwt = true

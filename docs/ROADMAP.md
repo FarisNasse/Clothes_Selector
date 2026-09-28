@@ -1,3 +1,7 @@
+# Roadmap (earlier proposal)
+
+AI-related milestones below are optional future concepts, not requirements for the current manual-entry app. The current add and recommendation paths make no AI requests.
+
 # Production Roadmap
 
 ## Milestone 0 — Foundation — included in this patch

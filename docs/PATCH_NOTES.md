@@ -1,3 +1,7 @@
+# Original patch notes (historical)
+
+The current manual entry flow supersedes references below to automatic analysis and OpenAI setup. See `README.md` for current behavior.
+
 # Initial Patch Notes — v0.1.0
 
 ## Purpose

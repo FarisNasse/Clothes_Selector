@@ -129,7 +129,9 @@ export async function createGarment(userId: string, draft: GarmentDraft): Promis
     .select('*')
     .single();
   if (error) throw error;
-  const [garment] = await withSignedImages([rowToGarment(data as Record<string, unknown>)]);
+  // The row is committed already; a transient signing failure must not invite a duplicate insert.
+  const [garment] = await withSignedImages([rowToGarment(data as Record<string, unknown>)])
+    .catch(() => [rowToGarment(data as Record<string, unknown>)]);
   if (!garment) throw new Error('The saved garment was not returned.');
   return garment;
 }
@@ -158,7 +160,8 @@ export async function updateGarment(
     .select('*')
     .single();
   if (error) throw error;
-  const [garment] = await withSignedImages([rowToGarment(data as Record<string, unknown>)]);
+  const [garment] = await withSignedImages([rowToGarment(data as Record<string, unknown>)])
+    .catch(() => [rowToGarment(data as Record<string, unknown>)]);
   if (!garment) throw new Error('The updated garment was not returned.');
   return garment;
 }
