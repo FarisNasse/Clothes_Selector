@@ -29,9 +29,10 @@ For iOS or Android, use Expo Go where supported or a development build when nati
 ## What the app does
 
 - Create, browse, edit, and delete structured garment records.
-- Optionally attach JPEG, PNG, or WebP photos to garments in connected mode.
+- Optionally attach JPEG, PNG, or WebP photos in connected mode; demo photos stay in the current app session.
 - Filter and search the wardrobe. Saved looks and favorites sync for signed-in accounts; demo collections stay on the device.
-- Generate local outfit candidates with factual reason traces, quiet/expressive intent, one-look skips, and optional confirmed rain protection.
+- Generate local outfit candidates with factual reason traces, quiet/expressive intent, one-look skips, covered-leg and confirmed rain-protection requirements, two-top layers, and a coat over a suit.
+- Switch between a flat lay and an illustrated on-mannequin preview. The drawing conveys broad silhouette and layering, not physical fit or exact fabric drape.
 - Lock a garment while exploring compatible outfits, record a worn outfit, and track garment wear counts.
 - Sign in with email and password and recover an account through Supabase Auth in connected mode.
 - Export account details as JSON and request account deletion through an authenticated server function. The JSON does not include photo bytes.
@@ -41,6 +42,8 @@ See [product scope](docs/product/product-overview.md) for boundaries and known l
 ## Connected mode
 
 Connected mode uses Supabase Auth, PostgreSQL, private Storage, and the `delete-account` Edge Function. Apply the SQL migrations in `supabase/migrations` and deploy `supabase/functions/delete-account` to the intended project before connecting the app. Set the client-safe values in `.env`:
+
+The September 30 migration changes saved-look keys and the wear RPC signature. Apply it before running a connected build from this revision; the older database function cannot accept the new retry token. Verify it against a separate staging project first.
 
 ```dotenv
 EXPO_PUBLIC_DEMO_MODE=false

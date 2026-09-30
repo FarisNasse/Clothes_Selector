@@ -138,7 +138,8 @@ function GarmentEditor({ garment }: { garment: Garment }) {
       await editGarment(garment.id, {
         ...checked.data,
         storagePath: path,
-        imageUrl: path === garment.storagePath ? garment.imageUrl : null,
+        imageUrl: isDemo ? (removePhoto || ignoreSelectedPhoto ? null : asset?.uri ?? garment.imageUrl)
+          : path === garment.storagePath ? garment.imageUrl : null,
         aiConfidence: null,
       });
       if (path) unused.current.delete(path);

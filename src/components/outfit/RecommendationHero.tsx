@@ -3,8 +3,10 @@ import { View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { OutfitFlatLay } from './OutfitFlatLay';
+import { OutfitMannequin } from './OutfitMannequin';
 import { AppText } from '@/components/primitives/AppText';
 import { Button } from '@/components/primitives/Button';
+import { Chip } from '@/components/primitives/Chip';
 import { IconButton } from '@/components/primitives/IconButton';
 import { AnimatedPressable } from '@/components/motion/AnimatedPressable';
 import { Entrance } from '@/components/motion/Entrance';
@@ -55,6 +57,16 @@ export function RecommendationHero({
   const { colors: c, reducedMotion } = useExperience();
   const wide = width >= 1000;
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [view, setView] = useState<'flat' | 'mannequin'>('flat');
+  useEffect(() => {
+    try { if (localStorage.getItem('clothes-selector:outfit-view') === 'mannequin') setView('mannequin'); }
+    catch { /* Keep the default if device storage is unavailable. */ }
+  }, []);
+  function selectView(next: 'flat' | 'mannequin') {
+    setView(next);
+    if (next === 'mannequin') setDetailsOpen(true);
+    try { localStorage.setItem('clothes-selector:outfit-view', next); } catch { /* Session choice still works. */ }
+  }
   const dominant = mood === 'rain' ? c.accent.navy : mood === 'evening' ? c.accent.burgundy : swatches[canonicalColor(recommendation.garments[0]?.primaryColor ?? '')] ?? c.canvas.editorial;
   const x = useSharedValue(0);
   const successScale = useSharedValue(1);
@@ -85,23 +97,27 @@ export function RecommendationHero({
       style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 52 : 14, alignItems: 'stretch' }}
     >
       <View style={{ flex: wide ? 1.6 : undefined, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 12 }}>
+          <Chip label="Flat lay" selected={view === 'flat'} onPress={() => selectView('flat')} />
+          <Chip label="On mannequin" selected={view === 'mannequin'} onPress={() => selectView('mannequin')} />
+        </View>
         <GestureDetector gesture={pan}>
           <Animated.View style={[drag, { shadowColor: '#17261C', shadowOpacity: .13, shadowRadius: 22, shadowOffset: { width: 0, height: 12 }, elevation: 5 }]}>
-            <OutfitFlatLay
+            {view === 'flat' ? <OutfitFlatLay
               garments={recommendation.garments}
               tint={dominant}
               label={contextLabel.toUpperCase()}
               lockedGarmentId={lockedGarmentId}
               lockedIds={lockedIds}
               onGarmentPress={onGarmentPress}
-            />
+            /> : <OutfitMannequin garments={recommendation.garments} label={contextLabel.toUpperCase()} />}
           </Animated.View>
         </GestureDetector>
         <View
           style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 }}
         >
           <AppText variant="metadata">
-            {onGarmentPress ? 'Tap a piece. Make it yours.' : 'Selected from your wardrobe.'}
+            {view === 'mannequin' ? 'Illustrative preview · fit and drape may differ.' : onGarmentPress ? 'Tap a piece. Make it yours.' : 'Selected from your wardrobe.'}
           </AppText>
           <AppText variant="micro" style={{ letterSpacing: 1 }}>
             {countLabel}
@@ -132,7 +148,7 @@ export function RecommendationHero({
           </AppText>
         </Entrance>
         {!wide ? <Button label={detailsOpen ? 'Hide the pieces' : 'Pieces in this look'} variant="quiet" icon={detailsOpen ? 'chevron-up' : 'chevron-down'} onPress={() => setDetailsOpen(!detailsOpen)} /> : null}
-        {(wide || detailsOpen) ? <View>
+        {(wide || detailsOpen || view === 'mannequin') ? <View>
           {recommendation.garments.map((item) => (
             <AnimatedPressable
               key={item.id}

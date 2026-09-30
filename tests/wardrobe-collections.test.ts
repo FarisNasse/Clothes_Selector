@@ -6,6 +6,7 @@ import {
   emptyCollection,
   readCollection,
   savedLook,
+  savedLookId,
   writeCollection,
 } from '../src/features/collections/storage';
 import { garmentDraftSchema, parseLabels } from '../src/features/wardrobe/validation';
@@ -34,6 +35,11 @@ test('wardrobe query intersects words with filters, secondary colors and favorit
   const clone = { ...shoe, secondaryColors: ['red'] };
   assert.deepEqual(filterWardrobe([clone], '', { ...defaultFilters, color: 'red' }), [clone]);
   assert.equal(activeFilterCount({ ...defaultFilters, color: 'red', favoritesOnly: true }), 2);
+  assert.equal(activeFilterCount({ ...defaultFilters, category: 'bottom' }), 1);
+  const shorts = demoWardrobe.find((item) => item.category === 'bottom' && /shorts/i.test(item.subcategory))!;
+  assert.deepEqual(filterWardrobe([shorts], 'pants', defaultFilters), []);
+  const unknown = { ...shorts, confirmedFields: [] };
+  assert.deepEqual(filterWardrobe([unknown], '', { ...defaultFilters, season: 'summer' }), []);
 });
 
 test('sorting does not mutate wardrobe inventory', () => {
@@ -57,10 +63,17 @@ test('collections survive reload, isolate owners and reject damaged or unavailab
     weather,
     styleProfile: demoStyleProfile,
   })[0]!;
-  const look = savedLook(outfit, 'dinner', weather);
+  const look = savedLook(outfit, 'dinner', weather, { coveredLegs: true, rainProtection: false });
+  assert.equal(look.id, savedLookId(outfit, 'dinner'));
+  assert.notEqual(look.id, savedLookId(outfit, 'work'));
+  assert.equal(look.requirements?.coveredLegs, true);
   const collection = { favorites: [demoWardrobe[0]!.id], looks: [look] };
   writeCollection(storage, 'owner-a', collection);
   assert.deepEqual(readCollection(storage, 'owner-a'), collection);
+  data.set(collectionKey('legacy'), JSON.stringify({ favorites: [], looks: [{ ...look,
+    id: look.id.split('@')[0],
+  }] }));
+  assert.equal(readCollection(storage, 'legacy').looks[0]?.id, look.id);
   assert.deepEqual(readCollection(storage, 'owner-b'), emptyCollection());
   data.set(collectionKey('owner-a'), '{bad');
   assert.deepEqual(readCollection(storage, 'owner-a'), emptyCollection());

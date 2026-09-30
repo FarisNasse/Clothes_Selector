@@ -19,4 +19,5 @@ export const defaultWeather: WeatherContext = {
   temperatureF: 65,
   precipitationProbability: 0,
   raining: false,
+  outdoorMinutes: 0,
 };

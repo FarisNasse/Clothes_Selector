@@ -9,7 +9,8 @@ export function summarizeStyle(garments: Garment[], profile: StyleProfile) {
   const colors = rank(garments.map((item) => item.primaryColor));
   const fits = rank(
     garments
-      .filter((item) => item.category !== 'footwear' && item.category !== 'accessory')
+      .filter((item) => item.category !== 'footwear' && item.category !== 'accessory' &&
+        (item.confirmedFields === undefined || item.confirmedFields.includes('fit')))
       .map((item) => item.fit),
   );
   const chosen = Object.entries(profile.styleWeights)
@@ -19,7 +20,7 @@ export function summarizeStyle(garments: Garment[], profile: StyleProfile) {
   return {
     colors: colors.slice(0, 5),
     descriptor,
-    fit: fits[0]?.[0] ?? profile.preferredFits[0] ?? null,
+    fit: fits[0]?.[0] ?? null,
     description: garments.length
       ? 'Your wardrobe leans toward ' +
         colors

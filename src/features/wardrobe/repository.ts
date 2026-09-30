@@ -5,10 +5,16 @@ import type { Garment, GarmentDraft } from '@/types/domain';
 
 const IMAGE_BUCKET = 'garment-images';
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
-const SIGNED_URL_CACHE_MS = 50 * 60 * 1000;
+const SIGNED_URL_CACHE_MS = 40 * 60 * 1000;
 
 type SignedUrlCacheEntry = { url: string; expiresAt: number };
 const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
+let demoGarments = [...demoWardrobe];
+export function recordDemoWear(ids: string[], timestamp: string) {
+  const worn = new Set(ids);
+  demoGarments = demoGarments.map((item) => worn.has(item.id)
+    ? { ...item, wearCount: item.wearCount + 1, lastWornAt: timestamp } : item);
+}
 
 function rowToGarment(row: Record<string, unknown>): Garment {
   return {
@@ -101,7 +107,7 @@ function draftToChanges(draft: GarmentDraft) {
 }
 
 export async function listGarments(userId?: string): Promise<Garment[]> {
-  if (env.demoMode) return demoWardrobe;
+  if (env.demoMode) return [...demoGarments];
   if (!supabase || !userId) return [];
 
   const { data, error } = await supabase
@@ -115,13 +121,15 @@ export async function listGarments(userId?: string): Promise<Garment[]> {
 
 export async function createGarment(userId: string, draft: GarmentDraft): Promise<Garment> {
   if (env.demoMode) {
-    return {
+    const created: Garment = {
       ...draft,
-      id: `demo-${Date.now()}`,
+      id: `demo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       userId: 'demo-user',
       wearCount: 0,
       lastWornAt: null,
     };
+    demoGarments = [created, ...demoGarments];
+    return created;
   }
   if (!supabase) throw new Error('Supabase is not configured.');
 
@@ -144,13 +152,11 @@ export async function updateGarment(
   draft: GarmentDraft,
 ): Promise<Garment> {
   if (env.demoMode) {
-    return {
-      ...draft,
-      id: garmentId,
-      userId: 'demo-user',
-      wearCount: 0,
-      lastWornAt: null,
-    };
+    const existing = demoGarments.find((item) => item.id === garmentId);
+    if (!existing) throw new Error('Garment not found.');
+    const updated = { ...existing, ...draft };
+    demoGarments = demoGarments.map((item) => item.id === garmentId ? updated : item);
+    return updated;
   }
   if (!supabase) throw new Error('Supabase is not configured.');
 
@@ -169,7 +175,10 @@ export async function updateGarment(
 }
 
 export async function deleteGarment(userId: string, garment: Garment): Promise<void> {
-  if (env.demoMode) return;
+  if (env.demoMode) {
+    demoGarments = demoGarments.filter((item) => item.id !== garment.id);
+    return;
+  }
   if (!supabase) throw new Error('Supabase is not configured.');
 
   // Remove the database row first. If that fails, the image remains recoverable.

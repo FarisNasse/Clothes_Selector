@@ -1,4 +1,7 @@
 import type { Garment, GarmentCategory, Season } from '@/types/domain';
+import { bottomCoverage } from './visual';
+const known = (item: Garment, field: 'fit' | 'formality' | 'seasons') =>
+  item.confirmedFields === undefined || item.confirmedFields.includes(field);
 export type WardrobeFilters = {
   category: GarmentCategory | 'all';
   color: string;
@@ -16,7 +19,7 @@ export const defaultFilters: WardrobeFilters = {
   sort: 'added',
 };
 function searchText(item: Garment) {
-  const occasions =
+  const occasions = !known(item, 'formality') ? '' :
     item.formality >= 7
       ? 'formal work dinner date'
       : item.formality >= 4
@@ -31,12 +34,13 @@ function searchText(item: Garment) {
     ...item.secondaryColors,
     ...item.styleTags,
     ...item.materials,
-    item.fit,
+    known(item, 'fit') ? item.fit : '',
     occasions,
     item.category === 'footwear'
       ? 'shoe shoes footwear'
       : item.category === 'bottom'
-        ? 'pants trousers bottoms'
+        ? bottomCoverage(item.subcategory) === 'full' ? 'pants trousers bottoms'
+          : bottomCoverage(item.subcategory) === 'short' ? 'shorts bottoms' : 'bottoms'
         : item.category === 'outerwear'
           ? 'jacket coat layer'
           : item.category + 's',
@@ -63,10 +67,11 @@ export function filterWardrobe(
       return false;
     if (
       filters.season !== 'all' &&
-      !item.seasons.includes(filters.season) &&
-      !item.seasons.includes('all-season')
+      (!known(item, 'seasons') || (!item.seasons.includes(filters.season) &&
+      !item.seasons.includes('all-season')))
     )
       return false;
+    if (filters.formality !== 'all' && !known(item, 'formality')) return false;
     if (filters.formality === 'casual' && item.formality > 3) return false;
     if (filters.formality === 'smart' && (item.formality < 4 || item.formality > 6)) return false;
     if (filters.formality === 'formal' && item.formality < 7) return false;
@@ -81,6 +86,7 @@ export function filterWardrobe(
 }
 export function activeFilterCount(filters: WardrobeFilters) {
   return (
+    Number(filters.category !== 'all') +
     Number(Boolean(filters.color)) +
     Number(filters.season !== 'all') +
     Number(filters.formality !== 'all') +

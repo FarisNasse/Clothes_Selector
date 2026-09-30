@@ -48,6 +48,8 @@ export type WeatherContext = {
   temperatureF: number;
   precipitationProbability: number;
   raining: boolean;
+  /** Minutes spent outside while wearing the look. Missing means unknown. */
+  outdoorMinutes?: number | undefined;
 };
 
 export type StyleProfile = {
@@ -77,7 +79,7 @@ export type OutfitRecommendation = {
 };
 
 export type OutfitReason = {
-  kind: 'palette' | 'pattern' | 'material' | 'rain' | 'rotation' | 'context' | 'intent';
+  kind: 'palette' | 'pattern' | 'material' | 'rain' | 'rotation' | 'context' | 'intent' | 'coverage' | 'uncertainty';
   garmentIds: string[];
   text: string;
 };

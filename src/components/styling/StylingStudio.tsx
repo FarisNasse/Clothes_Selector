@@ -16,7 +16,8 @@ import { SwapGarmentSheet } from './SwapGarmentSheet';
 import { defaultWeather, lookTitles, occasionLabels } from '@/features/styling/context';
 import { missingPieces } from '@/features/styling/session';
 import { useStylingSession } from '@/features/styling/useStylingSession';
-import type { SavedLook } from '@/features/collections/storage';
+import { newWearRequestId } from '@/features/recommendations/request';
+import { savedLookId, type SavedLook } from '@/features/collections/storage';
 import { useCollection } from '@/providers/CollectionProvider';
 import { useExperience } from '@/providers/ExperienceProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
@@ -33,18 +34,19 @@ export function StylingStudio({
 }) {
   const { garments, recordWear } = useWardrobe();
   const { profile } = useStyleProfile();
-  const { isDemo } = useSession();
-  const { looks, toggleLook, error: collectionError } = useCollection();
+  const { isDemo, session } = useSession();
+  const { looks, toggleLook, error: collectionError, retry: retryCollection } = useCollection();
   const { haptic } = useExperience();
   const [occasion, setOccasion] = useState<Occasion>(initialLook?.occasion ?? 'everyday');
   const [weather, setWeather] = useState<WeatherContext>(initialLook?.weather ?? defaultWeather);
   const [intent, setIntent] = useState<StylingIntent>('balanced');
-  const [requireRainProtection, setRequireRainProtection] = useState(false);
+  const [requireRainProtection, setRequireRainProtection] = useState(initialLook?.requirements?.rainProtection ?? false);
+  const [requireCoveredLegs, setRequireCoveredLegs] = useState(initialLook?.requirements?.coveredLegs ?? false);
   const [excludedGarmentIds, setExcludedGarmentIds] = useState<string[]>([]);
   const [now] = useState(() => new Date());
   const context = useMemo(
-    () => ({ occasion, weather, styleProfile: profile, now, intent, requireRainProtection, excludedGarmentIds }),
-    [occasion, weather, profile, now, intent, requireRainProtection, excludedGarmentIds],
+    () => ({ occasion, weather, styleProfile: profile, now, intent, requireRainProtection, requireCoveredLegs, excludedGarmentIds }),
+    [occasion, weather, profile, now, intent, requireRainProtection, requireCoveredLegs, excludedGarmentIds],
   );
   const styling = useStylingSession(garments, context, anchorId, initialLook?.garmentIds);
   const { state, dispatch, recommendation, selected, swaps, canChange, another, toggleLock } =
@@ -54,6 +56,7 @@ export function StylingStudio({
   const [swapping, setSwapping] = useState(false);
   const [recording, setRecording] = useState(false);
   const recordingRef = useRef(false);
+  const wearRequests = useRef(new Map<string, string>());
   const [worn, setWorn] = useState<string[]>([]);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   useEffect(() => {
@@ -64,7 +67,7 @@ export function StylingStudio({
   function resetContext(nextOccasion: Occasion, nextWeather: WeatherContext) {
     setOccasion(nextOccasion);
     setWeather(nextWeather);
-    if (!nextWeather.raining) setRequireRainProtection(false);
+    if (!nextWeather.raining && !nextWeather.precipitationProbability) setRequireRainProtection(false);
     styling.reset();
     setMessage(null);
     setSwapping(false);
@@ -76,12 +79,24 @@ export function StylingStudio({
   async function wear() {
     if (!recommendation || recordingRef.current || worn.includes(recommendation.id)) return;
     const accepted = recommendation;
+    const requestKey = `clothes-selector:wear-request:v1:${isDemo ? 'demo' : session?.user.id}:${accepted.id}`;
+    let requestId = wearRequests.current.get(accepted.id);
+    if (!requestId) {
+      try { requestId = localStorage.getItem(requestKey) ?? undefined; } catch { /* In-memory retry remains available. */ }
+    }
+    requestId ??= newWearRequestId();
+    wearRequests.current.set(accepted.id, requestId);
+    try { localStorage.setItem(requestKey, requestId); } catch { /* Server still deduplicates retries in this session. */ }
     recordingRef.current = true;
     setRecording(true);
     setMessage(null);
     dispatch({ type: 'keep', ids: accepted.garments.map((item) => item.id) });
     try {
-      await recordWear(accepted, occasion, weather);
+      await recordWear(accepted, occasion, weather, requestId, {
+        coveredLegs: requireCoveredLegs, rainProtection: requireRainProtection,
+      });
+      wearRequests.current.delete(accepted.id);
+      try { localStorage.removeItem(requestKey); } catch { /* A future retry returns the prior receipt. */ }
       setWorn((current) => [...current, accepted.id]);
       haptic('success');
       setMessage({
@@ -118,7 +133,7 @@ export function StylingStudio({
         </AppText>
         <Button
           label={
-            weather.temperatureF + '°F · ' + (weather.raining ? 'Rain' : 'Dry') + ' · Set weather'
+            weather.temperatureF + '°F · ' + (weather.raining ? 'Raining' : weather.precipitationProbability ? `${Math.round(weather.precipitationProbability * 100)}% rain` : 'Dry') + ' · Set weather'
           }
           variant="quiet"
           icon={weather.raining ? 'rainy-outline' : 'sunny-outline'}
@@ -148,7 +163,9 @@ export function StylingStudio({
               selected={intent === option} onPress={() => { setIntent(option); styling.reset(); }} />
           ))}
         </View>
-        {weather.raining ? <Chip label="Require marked rain protection for coat and shoes"
+        <Chip label="Require covered legs" selected={requireCoveredLegs}
+          onPress={() => { setRequireCoveredLegs((value) => !value); styling.reset(); }} />
+        {(weather.raining || weather.precipitationProbability > 0) ? <Chip label="Require marked rain protection for coat and shoes"
           selected={requireRainProtection}
           onPress={() => { setRequireRainProtection((value) => !value); styling.reset(); }} /> : null}
       </View>
@@ -189,10 +206,12 @@ export function StylingStudio({
                 String(styling.recommendations.length).padStart(2, '0')
               : 'YOUR EDIT'
           }
-          saved={looks.some((item) => item.id === recommendation.id)}
+          saved={looks.some((item) => item.id === savedLookId(recommendation, occasion))}
           onSave={async () => {
-            const wasSaved = looks.some((item) => item.id === recommendation.id);
-            if (await toggleLook(recommendation, occasion, weather)) {
+            const wasSaved = looks.some((item) => item.id === savedLookId(recommendation, occasion));
+            if (await toggleLook(recommendation, occasion, weather, {
+              coveredLegs: requireCoveredLegs, rainProtection: requireRainProtection,
+            })) {
               haptic('success');
               setMessage({
                 text: wasSaved
@@ -212,8 +231,10 @@ export function StylingStudio({
           detail={
             missingPieces(garments)
               ? 'Add ' + missingPieces(garments) + ' to build a complete look.'
-              : requireRainProtection && weather.raining
+              : requireRainProtection && (weather.raining || weather.precipitationProbability > 0)
                 ? 'No complete look has both a coat and shoes that you marked water resistant. Turn off the rain requirement or add the missing pieces.'
+                : requireCoveredLegs
+                  ? 'No complete look meets your covered-legs request. Add trousers or change that requirement.'
                 : 'These pieces do not make a complete match for this occasion. Try another occasion, show skipped pieces, or release your locks.'
           }
           actionLabel={missingPieces(garments) ? 'Add a piece' : 'Reset this look'}
@@ -236,7 +257,7 @@ export function StylingStudio({
       {message ? (
         <Notice message={message.text} tone={message.error ? 'error' : 'success'} />
       ) : null}
-      {collectionError ? <Notice message={collectionError} tone="error" /> : null}
+      {collectionError ? <Notice message={collectionError} tone="error" action="Retry sync" onAction={retryCollection} /> : null}
       <ContextSheet
         visible={contextOpen}
         weather={weather}
@@ -252,10 +273,7 @@ export function StylingStudio({
         {recommendation?.reasons?.slice(0, 3).map((reason, index) => (
           <AppText key={reason.kind + index} variant="bodyLarge">{reason.text}</AppText>
         )) ?? <AppText variant="bodyLarge">{recommendation?.explanation}</AppText>}
-        <AppText variant="muted">
-          Chosen for {label.toLowerCase()}, with {weather.raining ? 'rain' : 'dry conditions'} and{' '}
-          {weather.temperatureF}°F in mind.
-        </AppText>
+        <AppText variant="muted">For {label.toLowerCase()} at {weather.temperatureF}°F. Weather details depend on what you have confirmed for each piece.</AppText>
         <AppText variant="metadata">Only details you have recorded can support a specific claim. You can change any unlocked piece.</AppText>
       </BottomSheet>
       {selected && !swapping ? (

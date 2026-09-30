@@ -66,6 +66,9 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
           </View>
         </View>
       ) : null}
+      {value.category === 'suit' ? <AppText variant="metadata">
+        A suit here means a matching jacket and trousers as one set. Add a blazer by itself under Layers.
+      </AppText> : null}
       <View style={{ gap: 10 }}>
         <AppText variant="eyebrow">Color</AppText>
         {colorGroups.map((group) => (

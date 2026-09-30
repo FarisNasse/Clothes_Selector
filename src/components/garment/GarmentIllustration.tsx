@@ -2,6 +2,7 @@ import { useId } from 'react';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import type { Garment } from '@/types/domain';
 import { canonicalColor, colorSwatches } from '@/features/wardrobe/catalog';
+import { accessoryPlacement, bottomCoverage } from '@/features/wardrobe/visual';
 
 export const swatches = colorSwatches;
 export function GarmentIllustration({
@@ -16,6 +17,8 @@ export function GarmentIllustration({
   const boot = /boot|chelsea/i.test(garment.subcategory);
   const jacket = garment.category === 'outerwear' || garment.category === 'suit';
   const fill = 'url(#' + id + ')';
+  const accessory = accessoryPlacement(garment.subcategory);
+  const coverage = bottomCoverage(garment.subcategory);
   return (
     <Svg width="100%" height="100%" viewBox="0 0 220 280" aria-hidden focusable={false}>
       <Defs>
@@ -26,7 +29,14 @@ export function GarmentIllustration({
           <Stop offset="1" stopColor={tone} stopOpacity="0.8" />
         </LinearGradient>
       </Defs>
-      {garment.category === 'bottom' ? (
+      {garment.category === 'bottom' && coverage === 'short' ? (
+        <G>
+          <Path d="M58 18 Q110 24 163 18 L174 171 L121 173 L111 101 L99 173 L47 171 Z" fill={fill} stroke={shade} strokeWidth="1.5" />
+          <Path d="M58 31 Q110 37 163 31 M111 32 L111 91 M47 163 L99 166 M121 166 L174 163" fill="none" stroke={shade} strokeWidth="2" />
+        </G>
+      ) : garment.category === 'bottom' && coverage === 'unknown' ? (
+        <G><Rect x="48" y="38" width="124" height="198" rx="18" fill={fill} opacity=".35" stroke={shade} strokeDasharray="6 6" /></G>
+      ) : garment.category === 'bottom' ? (
         <G>
           <Path
             d="M58 17 Q110 24 163 17 L175 249 Q152 256 128 251 L111 111 L97 252 Q72 258 49 250 Z"
@@ -77,12 +87,21 @@ export function GarmentIllustration({
             </G>
           ))}
         </G>
-      ) : garment.category === 'accessory' ? (
+      ) : garment.category === 'accessory' && accessory === 'wrist' ? (
         <G>
           <Rect x="84" y="22" width="51" height="232" rx="13" fill={fill} stroke={shade} />
           <Circle cx="110" cy="134" r="42" fill={tone} stroke="#BBA784" strokeWidth="5" />
           <Circle cx="110" cy="134" r="34" fill="#EAE3D2" />
           <Path d="M110 111 L110 134 L127 144" stroke={tone} strokeWidth="3" fill="none" />
+        </G>
+      ) : garment.category === 'accessory' ? (
+        <G fill={fill} stroke={shade} strokeWidth="3">
+          {accessory === 'head' ? <Path d="M42 144 Q46 47 110 43 Q174 47 178 144 Z M30 146 Q110 169 190 146" /> : null}
+          {accessory === 'eyes' ? <Path d="M24 106 H93 L110 121 L127 106 H196 M27 108 Q33 176 85 161 Q100 154 93 108 M127 108 Q120 154 135 161 Q187 176 193 108" fill="none" /> : null}
+          {accessory === 'neck' ? <Path d="M78 27 L109 80 L141 27 M109 80 L82 241 L109 260 L137 241 Z" /> : null}
+          {accessory === 'waist' ? <G><Rect x="20" y="115" width="180" height="44" rx="7" /><Rect x="88" y="110" width="46" height="54" fill="#D9C9AB" /></G> : null}
+          {accessory === 'shoulder' ? <G><Path d="M45 102 Q45 13 111 14 Q179 13 179 102" fill="none" strokeWidth="12" /><Rect x="37" y="89" width="146" height="152" rx="16" /></G> : null}
+          {accessory === 'unknown' ? <Rect x="50" y="50" width="120" height="170" rx="20" opacity=".3" strokeDasharray="6 6" /> : null}
         </G>
       ) : (
         <G>

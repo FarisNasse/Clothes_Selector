@@ -18,7 +18,8 @@ type Collections = Collection & {
   importFromDevice: () => Promise<number>;
   toggleFavorite: (id: string) => Promise<boolean>;
   removeLook: (id: string) => Promise<boolean>;
-  toggleLook: (outfit: OutfitRecommendation, occasion: Occasion, weather: WeatherContext) => Promise<boolean>;
+  toggleLook: (outfit: OutfitRecommendation, occasion: Occasion, weather: WeatherContext,
+    requirements?: { coveredLegs: boolean; rainProtection: boolean }) => Promise<boolean>;
 };
 const Context = createContext<Collections | null>(null);
 
@@ -71,7 +72,7 @@ function AccountCollection({ owner, connected, children }: PropsWithChildren<{ o
       } catch {
         if (!active) return;
         setError(connected
-          ? 'Could not load synced looks and favorites. Check your connection and reopen this screen.'
+          ? 'Showing cached looks and favorites read-only. Check your connection, then retry sync.'
           : 'Device storage is unavailable. Saved looks and favorites cannot be changed right now.');
         setReady(false);
       } finally {
@@ -144,8 +145,8 @@ function AccountCollection({ owner, connected, children }: PropsWithChildren<{ o
         ? value.favorites.filter((item) => item !== id) : [...value.favorites, id] }),
       async (value) => { if (connected) await setAccountFavorite(owner, id, !value.favorites.includes(id)); },
     ),
-    toggleLook: (outfit, occasion, weather) => {
-      const look = savedLook(outfit, occasion, weather);
+    toggleLook: (outfit, occasion, weather, requirements) => {
+      const look = savedLook(outfit, occasion, weather, requirements);
       return commit(
         (value) => ({ ...value, looks: value.looks.some((item) => item.id === look.id)
           ? value.looks.filter((item) => item.id !== look.id) : [look, ...value.looks] }),

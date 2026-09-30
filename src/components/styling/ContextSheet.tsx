@@ -4,6 +4,7 @@ import { BottomSheet } from '@/components/sheets/BottomSheet';
 import { AppText } from '@/components/primitives/AppText';
 import { Button } from '@/components/primitives/Button';
 import { Chip } from '@/components/primitives/Chip';
+import { TextField } from '@/components/primitives/TextField';
 import type { WeatherContext } from '@/types/domain';
 export function ContextSheet({
   visible,
@@ -17,8 +18,9 @@ export function ContextSheet({
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(weather);
+  const [temperature, setTemperature] = useState(String(weather.temperatureF));
   useEffect(() => {
-    if (visible) setDraft(weather);
+    if (visible) { setDraft(weather); setTemperature(String(weather.temperatureF)); }
   }, [visible, weather]);
   return (
     <BottomSheet
@@ -28,6 +30,8 @@ export function ContextSheet({
       onClose={onClose}
     >
       <AppText variant="eyebrow">Temperature</AppText>
+      <TextField label="Temperature (°F)" value={temperature} onChangeText={setTemperature}
+        keyboardType="number-pad" accessibilityHint="Enter a number between minus 20 and 120" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {[
           [40, 'Cold · 40°'],
@@ -40,7 +44,7 @@ export function ContextSheet({
             key={value}
             label={String(label)}
             selected={draft.temperatureF === value}
-            onPress={() => setDraft((current) => ({ ...current, temperatureF: Number(value) }))}
+            onPress={() => { setTemperature(String(value)); setDraft((current) => ({ ...current, temperatureF: Number(value) })); }}
           />
         ))}
       </View>
@@ -60,15 +64,27 @@ export function ContextSheet({
             setDraft((current) => ({
               ...current,
               raining,
-              precipitationProbability: raining ? 1 : 0,
             }))
           }
         />
       </View>
+      <AppText variant="eyebrow">Chance of rain during your day</AppText>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {[0, 0.3, 0.7, 1].map((chance) => <Chip key={chance} label={`${chance * 100}%`}
+          selected={draft.precipitationProbability === chance}
+          onPress={() => setDraft((current) => ({ ...current, precipitationProbability: chance }))} />)}
+      </View>
+      <AppText variant="eyebrow">Time outdoors</AppText>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {[[0, 'Mostly indoors'], [10, 'About 10 min'], [30, '30+ min']].map(([minutes, label]) =>
+          <Chip key={minutes} label={String(label)} selected={draft.outdoorMinutes === minutes}
+            onPress={() => setDraft((current) => ({ ...current, outdoorMinutes: Number(minutes) }))} />)}
+      </View>
       <Button
         label="Use these conditions"
+        disabled={!Number.isFinite(Number(temperature)) || Number(temperature) < -20 || Number(temperature) > 120 || !temperature.trim()}
         onPress={() => {
-          onApply(draft);
+          onApply({ ...draft, temperatureF: Number(temperature) });
           onClose();
         }}
       />

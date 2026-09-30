@@ -9,6 +9,7 @@ import type {
   WeatherContext,
 } from '@/types/domain';
 import { canonicalColor, colorSwatches } from '@/features/wardrobe/catalog';
+import { bottomCoverage, topRole } from '@/features/wardrobe/visual';
 
 const weights: Record<keyof OutfitScoreBreakdown, number> = {
   colorHarmony: 0.14,
@@ -44,6 +45,7 @@ export type GenerateOutfitInput = {
   excludedGarmentIds?: string[];
   intent?: StylingIntent;
   requireRainProtection?: boolean;
+  requireCoveredLegs?: boolean;
   limit?: number;
   now?: Date;
 };
@@ -168,16 +170,26 @@ function weatherScore(garments: Garment[], weather: WeatherContext) {
   const outerwear = garments.find((garment) => garment.category === 'outerwear');
   const footwear = garments.find((garment) => garment.category === 'footwear');
   const knownWarmth = garments.filter((item) => item.category !== 'accessory' && confirmed(item, 'warmth'));
-  const avgWarmth = average(knownWarmth.map((garment) => garment.warmth));
-
   let score = 1;
-
-  if (knownWarmth.length && weather.temperatureF >= 78 && avgWarmth > 4.5) score -= 0.5;
-  if (knownWarmth.length && weather.temperatureF <= 50 && avgWarmth < 3.5) score -= 0.35;
-  if (knownWarmth.length && weather.temperatureF <= 42 && !outerwear && avgWarmth < 6) score -= 0.3;
-  if (weather.raining && outerwear && confirmed(outerwear, 'waterproof') && !outerwear.waterproof) score -= 0.22;
-  if (weather.raining && !outerwear) score -= 0.12;
-  if (weather.raining && footwear && confirmed(footwear, 'waterproof') && !footwear.waterproof) score -= 0.16;
+  const temperature = weather.temperatureF;
+  // Each layer matters: a cool shoe or shirt cannot cancel a very warm coat.
+  if (temperature > 70) score -= Math.min(0.55, knownWarmth.reduce((penalty, item) =>
+    penalty + Math.max(0, item.warmth - (5 - (temperature - 70) / 9)) * 0.035, 0));
+  if (temperature < 55) {
+    const exposed = garments.filter((item) => ['bottom', 'footwear', 'top'].includes(item.category));
+    score -= Math.min(0.5, exposed.reduce((penalty, item) =>
+      penalty + (confirmed(item, 'warmth') ? Math.max(0, (55 - temperature) / 9 - item.warmth) * 0.035 : 0.06), 0));
+    if (!outerwear && temperature < 45) score -= (45 - temperature) * 0.012;
+  }
+  const rainChance = Math.max(weather.raining ? 1 : 0, clamp01(weather.precipitationProbability));
+  const exposure = Math.min(1, Math.max(0, weather.outdoorMinutes ?? 15) / 20);
+  if (rainChance > 0) {
+    const rainWeight = rainChance * exposure;
+    if (!outerwear || !confirmed(outerwear, 'waterproof') || !outerwear.waterproof) score -= 0.24 * rainWeight;
+    if (!footwear || !confirmed(footwear, 'waterproof') || !footwear.waterproof) score -= 0.22 * rainWeight;
+    const bottom = garments.find((item) => item.category === 'bottom');
+    if (bottom && confirmed(bottom, 'waterproof') && bottom.waterproof) score += 0.04 * rainWeight;
+  }
   const season = weather.temperatureF >= 75 ? 'summer' : weather.temperatureF <= 42 ? 'winter' : null;
   if (season) score -= Math.min(0.35, garments.filter((item) =>
     item.category !== 'accessory' && confirmed(item, 'seasons') && !item.seasons.includes(season) &&
@@ -212,8 +224,10 @@ function rotationScore(garments: Garment[], nowDate: Date) {
   );
 }
 
-function isHardCompatible(candidate: Candidate, occasion: Occasion, weather: WeatherContext, requireRainProtection = false) {
-  if (requireRainProtection && weather.raining) {
+function isHardCompatible(candidate: Candidate, occasion: Occasion, requireRainProtection = false, requireCoveredLegs = false) {
+  if (requireCoveredLegs && !candidate.some((item) => item.category === 'suit' ||
+    (item.category === 'bottom' && bottomCoverage(item.subcategory) === 'full'))) return false;
+  if (requireRainProtection) {
     const coat = candidate.find((item) => item.category === 'outerwear');
     const shoes = candidate.find((item) => item.category === 'footwear');
     if (!coat || !shoes || !confirmed(coat, 'waterproof') || !coat.waterproof ||
@@ -222,18 +236,12 @@ function isHardCompatible(candidate: Candidate, occasion: Occasion, weather: Wea
 
   if (occasion === 'formal') {
     const footwear = candidate.find((garment) => garment.category === 'footwear');
-    const top = candidate.find((garment) => garment.category === 'top');
+    const tops = candidate.filter((garment) => garment.category === 'top');
     const bottom = candidate.find((garment) => garment.category === 'bottom');
     if (!footwear || (confirmed(footwear, 'formality') && footwear.formality < 6) ||
-      !top || (confirmed(top, 'formality') && top.formality < 6) ||
-      (bottom && ((confirmed(bottom, 'formality') && bottom.formality < 6) || /shorts/i.test(bottom.subcategory)))) return false;
-  }
-
-  if (weather.temperatureF >= 82) {
-    const tooHeavy = candidate.some(
-      (garment) => garment.category === 'outerwear' && confirmed(garment, 'warmth') && garment.warmth >= 7,
-    );
-    if (tooHeavy) return false;
+      tops.length === 0 || tops.some((top) => confirmed(top, 'formality') && top.formality < 6) ||
+      (bottom && ((confirmed(bottom, 'formality') && bottom.formality < 6) || bottomCoverage(bottom.subcategory) === 'short')) ||
+      candidate.some((item) => item.category === 'suit' && confirmed(item, 'formality') && item.formality < 7)) return false;
   }
 
   return true;
@@ -269,14 +277,34 @@ function scoreCandidate(
   ).length;
   const intentAdjustment = intent === 'quiet' ? -Math.max(0, prominent - 1) * 0.07
     : intent === 'expressive' ? Math.min(prominent, 3) * 0.04 : 0;
-  return { score: Math.round(clamp01(weighted + intentAdjustment) * 100), breakdown };
+  return { score: Math.round(clamp01(weighted + intentAdjustment) * 1000) / 10, breakdown };
 }
 
-function explain(garments: Garment[], occasion: Occasion, weather: WeatherContext, intent: StylingIntent): OutfitReason[] {
+function explain(garments: Garment[], occasion: Occasion, weather: WeatherContext, intent: StylingIntent, requireCoveredLegs = false): OutfitReason[] {
   const top = garments.find((garment) => garment.category === 'top');
   const bottom = garments.find((garment) => garment.category === 'bottom' || garment.category === 'suit');
   const footwear = garments.find((garment) => garment.category === 'footwear');
   const reasons: OutfitReason[] = [];
+  const coat = garments.find((item) => item.category === 'outerwear');
+  const rainExpected = weather.raining || weather.precipitationProbability > 0;
+  if (requireCoveredLegs && bottom) reasons.push({ kind: 'coverage', garmentIds: [bottom.id],
+    text: `Your ${bottom.name} meets your covered-legs request.`,
+  });
+  if (rainExpected && coat && footwear && coat.waterproof && footwear.waterproof &&
+    confirmed(coat, 'waterproof') && confirmed(footwear, 'waterproof')) {
+    reasons.push({ kind: 'rain', garmentIds: [coat.id, footwear.id],
+      text: `Your ${coat.name} and ${footwear.name} are both marked water resistant for the rain you set.`,
+    });
+  } else if (rainExpected) {
+    const unprotected = [coat, footwear].filter((item): item is Garment => Boolean(item) &&
+      (!confirmed(item!, 'waterproof') || !item!.waterproof));
+    if (unprotected.length) reasons.push({ kind: 'uncertainty', garmentIds: unprotected.map((item) => item.id),
+      text: `Your ${unprotected.map((item) => item.name).join(' and ')} ${unprotected.length === 1 ? 'is' : 'are'} not marked water resistant${coat ? '' : ', and this look has no outer layer'}.`,
+    });
+    else if (footwear && !coat) reasons.push({ kind: 'uncertainty', garmentIds: [footwear.id],
+      text: `Your ${footwear.name} is marked water resistant, but this look has no outer layer.`,
+    });
+  }
   if (top && bottom) reasons.push({ kind: 'palette', garmentIds: [top.id, bottom.id],
     text: top.primaryColor.toLowerCase() === bottom.primaryColor.toLowerCase()
       ? `Your ${top.name} and ${bottom.name} repeat ${top.primaryColor} for a tonal look.`
@@ -287,13 +315,6 @@ function explain(garments: Garment[], occasion: Occasion, weather: WeatherContex
     const item = patterns[0];
     reasons.push({ kind: 'pattern', garmentIds: [item.id],
       text: `The ${item.pattern} on your ${item.name} is the look's recorded pattern.`,
-    });
-  }
-  const coat = garments.find((item) => item.category === 'outerwear');
-  if (weather.raining && coat && footwear && coat.waterproof && footwear.waterproof &&
-    confirmed(coat, 'waterproof') && confirmed(footwear, 'waterproof')) {
-    reasons.push({ kind: 'rain', garmentIds: [coat.id, footwear.id],
-      text: `Your ${coat.name} and ${footwear.name} are both marked water resistant for the rain you set.`,
     });
   }
   if (footwear?.materials.length) reasons.push({ kind: 'material', garmentIds: [footwear.id],
@@ -314,19 +335,19 @@ const MAX_CANDIDATES = 8000;
 
 /** Bound work for large closets; walk each product with a deterministic coprime stride. */
 function* combinations(slots: Slot[], budget: number): Generator<Garment[]> {
-  const total = slots.reduce((count, slot) => count * slot.length, 1);
-  if (!total) return;
-  const count = Math.min(total, budget);
-  let step = total <= budget ? 1 : Math.max(1, Math.floor(total * 0.61803398875));
-  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
-  while (gcd(step, total) !== 1) step += 1;
-  let ordinal = 0;
+  const total = slots.reduce((count, slot) => count * BigInt(slot.length), 1n);
+  if (total === 0n) return;
+  const count = Number(total < BigInt(budget) ? total : BigInt(budget));
+  let step = total <= BigInt(budget) ? 1n : total * 618033n / 1_000_000n + 1n;
+  const gcd = (a: bigint, b: bigint): bigint => (b ? gcd(b, a % b) : a);
+  while (gcd(step, total) !== 1n) step += 1n;
+  let ordinal = 0n;
   for (let sample = 0; sample < count; sample += 1) {
     let remainder = ordinal;
     const candidate: Garment[] = [];
     for (const slot of slots) {
-      const item = slot[remainder % slot.length];
-      remainder = Math.floor(remainder / slot.length);
+      const item = slot[Number(remainder % BigInt(slot.length))];
+      remainder /= BigInt(slot.length);
       if (item) candidate.push(item);
     }
     yield candidate;
@@ -338,7 +359,8 @@ function* buildCandidates(wardrobe: Garment[], lockedIds: string[]): Generator<G
   const unique = [...new Map(wardrobe.map((item) => [item.id, item])).values()];
   const locks = lockedIds.map((id) => unique.find((item) => item.id === id));
   if (locks.some((item) => !item)) return;
-  if (new Set(locks.map((item) => item?.category)).size !== locks.length) return;
+  if (locks.filter((item) => item?.category === 'top').length > 2 ||
+    locks.some((item) => item?.category !== 'top' && locks.filter((other) => other?.category === item?.category).length > 1)) return;
   const pool = (category: Garment['category']): Garment[] => {
     const locked = locks.find((item) => item?.category === category);
     return locked ? [locked] : unique.filter((item) => item.category === category);
@@ -347,28 +369,36 @@ function* buildCandidates(wardrobe: Garment[], lockedIds: string[]): Generator<G
     locks.some((item) => item?.category === category)
       ? pool(category)
       : [undefined, ...pool(category)];
-  const regular: Slot[] = [
-    optional('outerwear'),
-    pool('top'),
-    pool('bottom'),
-    pool('footwear'),
-    optional('accessory'),
+  const tops = unique.filter((item) => item.category === 'top');
+  const lockedTops = locks.filter((item): item is Garment => item?.category === 'top');
+  if (lockedTops.length === 2 && topRole(lockedTops[0]!.subcategory) === topRole(lockedTops[1]!.subcategory)) return;
+  const base = lockedTops.find((item) => topRole(item.subcategory) === 'base');
+  const mid = lockedTops.find((item) => topRole(item.subcategory) === 'mid');
+  const basePool = base ? [base] : tops.filter((item) => topRole(item.subcategory) === 'base' && !lockedTops.includes(item));
+  const singleTop = lockedTops.length === 1 ? lockedTops : tops;
+  const midPool: Slot = mid ? [mid] : [undefined, ...tops.filter((item) => topRole(item.subcategory) === 'mid' && !lockedTops.includes(item))];
+  const plainTop: Slot = lockedTops.length > 1 ? [] : singleTop;
+  const regular = (layered: boolean): Slot[] => [
+    optional('outerwear'), layered ? basePool : plainTop,
+    ...(layered ? [midPool] : []), pool('bottom'), pool('footwear'), optional('accessory'),
   ];
-  const suited: Slot[] = [pool('suit'), pool('top'), pool('footwear'), optional('accessory')];
+  const suited = (layered: boolean): Slot[] => [
+    optional('outerwear'), pool('suit'), layered ? basePool : plainTop,
+    ...(layered ? [midPool] : []), pool('footwear'), optional('accessory'),
+  ];
   const structures = [
-    ...(!locks.some((item) => item?.category === 'suit') ? [regular] : []),
-    ...(!locks.some((item) => item?.category === 'bottom' || item?.category === 'outerwear')
-      ? [suited]
-      : []),
+    ...(!locks.some((item) => item?.category === 'suit') ? [regular(false), regular(true)] : []),
+    ...(!locks.some((item) => item?.category === 'bottom') ? [suited(false), suited(true)] : []),
   ].filter((slots) => slots.every((slot) => slot.length > 0));
   for (const slots of structures) {
-    yield* combinations(slots, Math.floor(MAX_CANDIDATES / structures.length));
+    for (const candidate of combinations(slots, Math.floor(MAX_CANDIDATES / structures.length)))
+      if (lockedIds.every((id) => candidate.some((item) => item.id === id))) yield candidate;
   }
 }
 
 export type OutfitContext = Pick<
   GenerateOutfitInput,
-  'occasion' | 'weather' | 'styleProfile' | 'now' | 'intent' | 'requireRainProtection' | 'excludedGarmentIds'
+  'occasion' | 'weather' | 'styleProfile' | 'now' | 'intent' | 'requireRainProtection' | 'requireCoveredLegs' | 'excludedGarmentIds'
 >;
 export function outfitKey(ids: string[]): string {
   return [...ids].sort().join(':');
@@ -380,6 +410,7 @@ export function evaluateOutfit(
   context: OutfitContext,
 ): OutfitRecommendation | null {
   const categories = new Set(garments.map((item) => item.category));
+  const tops = garments.filter((item) => item.category === 'top');
   if (garments.some((item) => context.excludedGarmentIds?.includes(item.id))) return null;
   const complete =
     categories.has('top') &&
@@ -387,13 +418,15 @@ export function evaluateOutfit(
     (categories.has('bottom') || categories.has('suit'));
   if (
     !complete ||
-    categories.size !== garments.length ||
+    tops.length > 2 || tops.length === 0 ||
+    (tops.length === 2 && (topRole(tops[0]!.subcategory) === topRole(tops[1]!.subcategory))) ||
+    garments.some((item) => item.category !== 'top' && garments.filter((other) => other.category === item.category).length > 1) ||
     new Set(garments.map((item) => item.id)).size !== garments.length
   )
     return null;
-  if (categories.has('suit') && (categories.has('bottom') || categories.has('outerwear')))
+  if (categories.has('suit') && categories.has('bottom'))
     return null;
-  if (!isHardCompatible(garments, context.occasion, context.weather, context.requireRainProtection)) return null;
+  if (!isHardCompatible(garments, context.occasion, context.requireRainProtection, context.requireCoveredLegs)) return null;
   const { score, breakdown } = scoreCandidate(
     garments,
     context.occasion,
@@ -402,7 +435,7 @@ export function evaluateOutfit(
     context.now ?? new Date(),
     context.intent ?? 'balanced',
   );
-  const reasons = explain(garments, context.occasion, context.weather, context.intent ?? 'balanced');
+  const reasons = explain(garments, context.occasion, context.weather, context.intent ?? 'balanced', context.requireCoveredLegs);
   return {
     id: outfitKey(garments.map((item) => item.id)),
     garments,
@@ -424,6 +457,7 @@ export function generateOutfits({
   excludedGarmentIds = [],
   intent = 'balanced',
   requireRainProtection = false,
+  requireCoveredLegs = false,
   limit = 3,
   now = new Date(),
 }: GenerateOutfitInput): OutfitRecommendation[] {
@@ -431,8 +465,15 @@ export function generateOutfits({
   const locks = [...new Set([...lockedGarmentIds, ...(lockedGarmentId ? [lockedGarmentId] : [])])];
   if (locks.some((id) => excludedGarmentIds.includes(id))) return [];
   const ranked: OutfitRecommendation[] = [];
-  for (const candidate of buildCandidates(wardrobe.filter((item) => !excludedGarmentIds.includes(item.id)), locks)) {
-    const recommendation = evaluateOutfit(candidate, { occasion, weather, styleProfile, now, intent, requireRainProtection, excludedGarmentIds });
+  const eligible = wardrobe.filter((item) => {
+    if (excludedGarmentIds.includes(item.id)) return false;
+    if (requireCoveredLegs && item.category === 'bottom' && bottomCoverage(item.subcategory) !== 'full') return false;
+    if (requireRainProtection && ['outerwear', 'footwear'].includes(item.category) &&
+      (!confirmed(item, 'waterproof') || !item.waterproof)) return false;
+    return true;
+  });
+  for (const candidate of buildCandidates(eligible, locks)) {
+    const recommendation = evaluateOutfit(candidate, { occasion, weather, styleProfile, now, intent, requireRainProtection, requireCoveredLegs, excludedGarmentIds });
     if (recommendation) ranked.push(recommendation);
   }
   ranked.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));

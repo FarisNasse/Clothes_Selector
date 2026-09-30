@@ -1,6 +1,7 @@
 import { env } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
 import { parseSavedLook, type Collection, type SavedLook } from './storage';
+import { outfitKey } from '@/features/recommendations/engine';
 
 function client() {
   if (env.demoMode || !supabase) throw new Error('Account collections require connected mode.');
@@ -14,7 +15,7 @@ export async function listAccountCollection(userId: string): Promise<Collection>
     const [favoriteResult, lookResult] = await Promise.all([
       db.from('favorite_garments').select('garment_id').eq('user_id', userId)
         .order('garment_id').range(start, start + 999),
-      db.from('saved_looks').select('look_key, garment_ids, occasion, weather, created_at')
+      db.from('saved_looks').select('look_key, garment_ids, occasion, weather, requirements, created_at')
         .eq('user_id', userId).order('created_at', { ascending: false })
         .order('look_key').range(start, start + 999),
     ]);
@@ -24,7 +25,7 @@ export async function listAccountCollection(userId: string): Promise<Collection>
     collection.looks.push(...(lookResult.data ?? []).flatMap((row) => {
       const parsed = parseSavedLook({
         id: row.look_key, garmentIds: row.garment_ids, occasion: row.occasion,
-        weather: row.weather, createdAt: row.created_at,
+        weather: row.weather, requirements: row.requirements, createdAt: row.created_at,
       });
       return parsed ? [parsed] : [];
     }));
@@ -51,6 +52,7 @@ export async function setAccountLook(userId: string, look: SavedLook | string, s
         garment_ids: look.garmentIds,
         occasion: look.occasion,
         weather: look.weather,
+        requirements: look.requirements ?? {},
         created_at: look.createdAt,
       });
     if (error) throw error;
@@ -73,7 +75,8 @@ export async function importDeviceCollection(userId: string, collection: Collect
     if (!data || data.length < 1000) break;
   }
   const favorites = collection.favorites.filter((id) => owned.has(id));
-  const looks = collection.looks.filter((look) => look.garmentIds.every((id) => owned.has(id)));
+  const looks = collection.looks.filter((look) => look.garmentIds.every((id) => owned.has(id)))
+    .map((look) => ({ ...look, id: outfitKey(look.garmentIds) + '@' + look.occasion }));
   for (let start = 0; start < favorites.length; start += 100) {
     const result = await db.from('favorite_garments').upsert(
       favorites.slice(start, start + 100).map((garmentId) => ({ user_id: userId, garment_id: garmentId })),
@@ -85,7 +88,8 @@ export async function importDeviceCollection(userId: string, collection: Collect
     const result = await db.from('saved_looks').upsert(
       looks.slice(start, start + 100).map((look) => ({
         user_id: userId, look_key: look.id, garment_ids: look.garmentIds,
-        occasion: look.occasion, weather: look.weather, created_at: look.createdAt,
+        occasion: look.occasion, weather: look.weather,
+        requirements: look.requirements ?? {}, created_at: look.createdAt,
       })),
       { onConflict: 'user_id,look_key', ignoreDuplicates: true },
     );

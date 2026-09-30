@@ -1,8 +1,9 @@
 import type { PropsWithChildren } from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { recordOutfitWear } from '@/features/recommendations/repository';
-import { createGarment, deleteGarment, listGarments, updateGarment } from '@/features/wardrobe/repository';
+import { createGarment, deleteGarment, listGarments, recordDemoWear, updateGarment } from '@/features/wardrobe/repository';
 import { useSession } from '@/providers/SessionProvider';
 import type { Garment, GarmentDraft, Occasion, OutfitRecommendation, WeatherContext } from '@/types/domain';
 
@@ -14,7 +15,8 @@ type WardrobeContextValue = {
   addGarment: (draft: GarmentDraft) => Promise<Garment>;
   editGarment: (garmentId: string, draft: GarmentDraft) => Promise<Garment>;
   removeGarment: (garmentId: string) => Promise<void>;
-  recordWear: (recommendation: OutfitRecommendation, occasion: Occasion, weather: WeatherContext) => Promise<void>;
+  recordWear: (recommendation: OutfitRecommendation, occasion: Occasion, weather: WeatherContext,
+    requestId: string, requirements: { coveredLegs: boolean; rainProtection: boolean }) => Promise<void>;
 };
 
 const WardrobeContext = createContext<WardrobeContextValue | null>(null);
@@ -24,12 +26,14 @@ export function WardrobeProvider({ children }: PropsWithChildren) {
   const [garments, setGarments] = useState<Garment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const lastImageRefresh = useRef(Date.now());
 
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       setGarments(await listGarments(isDemo ? 'demo-user' : session?.user.id));
+      lastImageRefresh.current = Date.now();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not load wardrobe.');
     } finally {
@@ -40,6 +44,22 @@ export function WardrobeProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    if (isDemo || !session?.user.id) return;
+    async function refreshImages() {
+      try {
+        const next = await listGarments(session?.user.id);
+        setGarments(next);
+        lastImageRefresh.current = Date.now();
+      } catch { /* Keep the last wardrobe and its illustration fallback while offline. */ }
+    }
+    const timer = setInterval(() => { void refreshImages(); }, 45 * 60 * 1000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && Date.now() - lastImageRefresh.current > 40 * 60 * 1000)
+        void refreshImages();
+    });
+    return () => { clearInterval(timer); subscription.remove(); };
+  }, [isDemo, session?.user.id]);
 
   const addGarment = useCallback(
     async (draft: GarmentDraft) => {
@@ -57,19 +77,11 @@ export function WardrobeProvider({ children }: PropsWithChildren) {
       const userId = isDemo ? 'demo-user' : session?.user.id;
       if (!userId) throw new Error('You must be signed in to edit a garment.');
 
-      if (isDemo) {
-        const currentGarment = garments.find((garment) => garment.id === garmentId);
-        if (!currentGarment) throw new Error('Garment not found.');
-        const updated: Garment = { ...currentGarment, ...draft };
-        setGarments((current) => current.map((garment) => (garment.id === garmentId ? updated : garment)));
-        return updated;
-      }
-
       const garment = await updateGarment(userId, garmentId, draft);
       setGarments((current) => current.map((item) => (item.id === garmentId ? garment : item)));
       return garment;
     },
-    [garments, isDemo, session?.user.id],
+    [isDemo, session?.user.id],
   );
 
   const removeGarment = useCallback(
@@ -85,15 +97,17 @@ export function WardrobeProvider({ children }: PropsWithChildren) {
   );
 
   const recordWear = useCallback(
-    async (recommendation: OutfitRecommendation, occasion: Occasion, weather: WeatherContext) => {
+    async (recommendation: OutfitRecommendation, occasion: Occasion, weather: WeatherContext,
+      requestId: string, requirements: { coveredLegs: boolean; rainProtection: boolean }) => {
       const userId = isDemo ? 'demo-user' : session?.user.id;
       if (!userId) throw new Error('You must be signed in to record an outfit.');
 
-      await recordOutfitWear({ userId, recommendation, occasion, weather });
+      await recordOutfitWear({ userId, recommendation, occasion, weather, requestId, requirements });
 
       if (isDemo) {
         const wornIds = new Set(recommendation.garments.map((garment) => garment.id));
         const timestamp = new Date().toISOString();
+        recordDemoWear([...wornIds], timestamp);
         setGarments((current) =>
           current.map((garment) =>
             wornIds.has(garment.id)
@@ -104,6 +118,7 @@ export function WardrobeProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      // The RPC is the commit boundary. A failed refresh cannot invite a second wear.
       await refresh();
     },
     [isDemo, refresh, session?.user.id],

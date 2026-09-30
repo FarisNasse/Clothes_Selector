@@ -68,7 +68,8 @@ test('suits and accessories can be anchors without duplicate garment slots', () 
   for (const result of results) {
     assert.ok(result.garments.includes(suit));
     assert.ok(result.garments.includes(accessory));
-    assert.ok(!result.garments.some((g) => g.category === 'bottom' || g.category === 'outerwear'));
+    assert.ok(!result.garments.some((g) => g.category === 'bottom'));
+    assert.ok(result.garments.filter((g) => g.category === 'outerwear').length <= 1);
   }
 });
 
@@ -89,13 +90,12 @@ test('swaps obey the same compatibility rules as generation and cannot replace l
   );
   assert.equal(evaluateOutfit([selected, selected], context), null);
   const hot = { ...garment('g-navy-harrington'), warmth: 9 };
-  assert.equal(
-    evaluateOutfit([...original.garments.filter((g) => g.category !== 'outerwear'), hot], {
+  const warmLook = evaluateOutfit([...original.garments.filter((g) => g.category !== 'outerwear'), hot], {
       ...context,
       weather: { ...context.weather, temperatureF: 90 },
-    }),
-    null,
-  );
+    });
+  assert.ok(warmLook);
+  assert.ok(warmLook.breakdown.weatherSuitability < original.breakdown.weatherSuitability);
 });
 
 test('styling state keeps anchors, rejects invalid swaps, undoes once, and clears undo on cycling', () => {

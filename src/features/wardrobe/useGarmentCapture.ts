@@ -109,7 +109,8 @@ export function useGarmentCapture() {
         }
       }
       if (!active.current) return;
-      const values = { ...checked.data, storagePath: path, imageUrl: null, aiConfidence: null };
+      const values = { ...checked.data, storagePath: path,
+        imageUrl: isDemo && withPhoto && asset ? asset.uri : null, aiConfidence: null };
       inserting = true;
       const garment = await addGarment(values);
       if (path) unused.current.delete(path);
