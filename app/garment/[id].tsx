@@ -108,8 +108,8 @@ export default function GarmentDetailScreen() {
                     }
                     icon={favorites.includes(garment.id) ? 'heart' : 'heart-outline'}
                     selected={favorites.includes(garment.id)}
-                    onPress={() => {
-                      if (toggleFavorite(garment.id)) haptic();
+                    onPress={async () => {
+                      if (await toggleFavorite(garment.id)) haptic();
                     }}
                   />
                 </View>

@@ -100,3 +100,64 @@ test('weather, pattern density, and formal top suitability affect the same outfi
   assert.equal(evaluateOutfit([{ ...top, formality: 2 }, bottom, shoes],
     { ...context, occasion: 'formal' }), null);
 });
+
+test('every generated reason names pieces in the displayed look after a swap', () => {
+  const context = { occasion: 'dinner' as const, weather: mildWeather,
+    styleProfile: demoStyleProfile, now };
+  const look = generateOutfits({ ...context, wardrobe: demoWardrobe })[0]!;
+  const replacement = demoWardrobe.find((item) => item.category === 'top' &&
+    !look.garments.some((piece) => piece.id === item.id))!;
+  const updated = evaluateOutfit(look.garments.map((item) => item.category === 'top' ? replacement : item), context);
+  assert.ok(updated);
+  assert.ok(updated.reasons?.length);
+  const ids = new Set(updated.garments.map((item) => item.id));
+  for (const reason of updated.reasons ?? []) {
+    assert.ok(reason.garmentIds.every((id) => ids.has(id)));
+    for (const id of reason.garmentIds) {
+      const item = updated.garments.find((piece) => piece.id === id)!;
+      if (reason.kind !== 'intent') assert.ok(reason.text.includes(item.name));
+    }
+  }
+  assert.ok(!updated.explanation.includes(look.garments.find((item) => item.category === 'top')!.name));
+});
+
+test('unknown default attributes cannot substantiate rain claims or hard rain protection', () => {
+  const top = demoWardrobe.find((item) => item.category === 'top')!;
+  const bottom = demoWardrobe.find((item) => item.category === 'bottom')!;
+  const shoe = { ...demoWardrobe.find((item) => item.category === 'footwear')!, waterproof: true,
+    confirmedFields: [] };
+  const coat = { ...demoWardrobe.find((item) => item.category === 'outerwear')!, waterproof: true,
+    confirmedFields: [] };
+  const context = { occasion: 'everyday' as const, weather: mildWeather,
+    styleProfile: demoStyleProfile, now };
+  const unconfirmed = evaluateOutfit([top, bottom, shoe, coat], context);
+  assert.ok(unconfirmed);
+  assert.ok(!unconfirmed.reasons?.some((reason) => reason.kind === 'rain'));
+  assert.equal(evaluateOutfit([top, bottom, shoe, coat],
+    { ...context, requireRainProtection: true }), null);
+  const confirmed = evaluateOutfit([top, bottom,
+    { ...shoe, confirmedFields: ['waterproof'] },
+    { ...coat, confirmedFields: ['waterproof'] }],
+  { ...context, requireRainProtection: true });
+  assert.ok(confirmed?.reasons?.some((reason) => reason.kind === 'rain'));
+});
+
+test('one-look exclusions and chosen intensity are honored', () => {
+  const base = { wardrobe: demoWardrobe, occasion: 'dinner' as const,
+    weather: mildWeather, styleProfile: demoStyleProfile, now };
+  const anchor = demoWardrobe.find((item) => item.category === 'footwear')!;
+  const excluded = generateOutfits({ ...base, excludedGarmentIds: [anchor.id] });
+  assert.ok(excluded.length);
+  assert.ok(excluded.every((look) => !look.garments.some((item) => item.id === anchor.id)));
+  assert.deepEqual(generateOutfits({ ...base, lockedGarmentId: anchor.id,
+    excludedGarmentIds: [anchor.id] }), []);
+  const colorful = (['top', 'bottom', 'footwear'] as const).map((category, index) => ({
+    ...demoWardrobe.find((item) => item.category === category)!,
+    primaryColor: ['red', 'forest green', 'cobalt blue'][index]!,
+    pattern: index === 0 ? 'stripe' : 'solid',
+  }));
+  const quiet = evaluateOutfit(colorful, { ...base, intent: 'quiet' });
+  const bold = evaluateOutfit(colorful, { ...base, intent: 'expressive' });
+  assert.ok(quiet && bold);
+  assert.ok(bold.score > quiet.score);
+});

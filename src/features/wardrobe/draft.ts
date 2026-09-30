@@ -21,6 +21,7 @@ export function manualGarmentDraft(): GarmentDraft {
     storagePath: null,
     purchasePrice: null,
     aiConfidence: null,
+    confirmedFields: [],
   };
 }
 
@@ -44,5 +45,6 @@ export function garmentToDraft(garment: Garment): GarmentDraft {
     storagePath: garment.storagePath,
     purchasePrice: garment.purchasePrice,
     aiConfidence: garment.aiConfidence,
+    confirmedFields: garment.confirmedFields ?? [],
   };
 }

@@ -22,7 +22,7 @@ import { useExperience } from '@/providers/ExperienceProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
 import { useStyleProfile } from '@/providers/StyleProfileProvider';
 import { useSession } from '@/providers/SessionProvider';
-import type { Occasion, WeatherContext } from '@/types/domain';
+import type { Occasion, StylingIntent, WeatherContext } from '@/types/domain';
 
 export function StylingStudio({
   anchorId,
@@ -38,10 +38,13 @@ export function StylingStudio({
   const { haptic } = useExperience();
   const [occasion, setOccasion] = useState<Occasion>(initialLook?.occasion ?? 'everyday');
   const [weather, setWeather] = useState<WeatherContext>(initialLook?.weather ?? defaultWeather);
+  const [intent, setIntent] = useState<StylingIntent>('balanced');
+  const [requireRainProtection, setRequireRainProtection] = useState(false);
+  const [excludedGarmentIds, setExcludedGarmentIds] = useState<string[]>([]);
   const [now] = useState(() => new Date());
   const context = useMemo(
-    () => ({ occasion, weather, styleProfile: profile, now }),
-    [occasion, weather, profile, now],
+    () => ({ occasion, weather, styleProfile: profile, now, intent, requireRainProtection, excludedGarmentIds }),
+    [occasion, weather, profile, now, intent, requireRainProtection, excludedGarmentIds],
   );
   const styling = useStylingSession(garments, context, anchorId, initialLook?.garmentIds);
   const { state, dispatch, recommendation, selected, swaps, canChange, another, toggleLock } =
@@ -61,6 +64,7 @@ export function StylingStudio({
   function resetContext(nextOccasion: Occasion, nextWeather: WeatherContext) {
     setOccasion(nextOccasion);
     setWeather(nextWeather);
+    if (!nextWeather.raining) setRequireRainProtection(false);
     styling.reset();
     setMessage(null);
     setSwapping(false);
@@ -136,6 +140,21 @@ export function StylingStudio({
           />
         ))}
       </ScrollView>
+      <View style={{ gap: 8 }}>
+        <AppText variant="eyebrow">How do you want to dress?</AppText>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {(['quiet', 'balanced', 'expressive'] as const).map((option) => (
+            <Chip key={option} label={option === 'balanced' ? 'Open to anything' : option}
+              selected={intent === option} onPress={() => { setIntent(option); styling.reset(); }} />
+          ))}
+        </View>
+        {weather.raining ? <Chip label="Require marked rain protection for coat and shoes"
+          selected={requireRainProtection}
+          onPress={() => { setRequireRainProtection((value) => !value); styling.reset(); }} /> : null}
+      </View>
+      {excludedGarmentIds.length ? <Notice
+        message={`${excludedGarmentIds.length} piece${excludedGarmentIds.length === 1 ? '' : 's'} skipped for this look.`}
+        action="Show all pieces" onAction={() => setExcludedGarmentIds([])} /> : null}
       {recommendation ? (
         <RecommendationHero
           recommendation={recommendation}
@@ -171,14 +190,15 @@ export function StylingStudio({
               : 'YOUR EDIT'
           }
           saved={looks.some((item) => item.id === recommendation.id)}
-          onSave={() => {
+          onSave={async () => {
             const wasSaved = looks.some((item) => item.id === recommendation.id);
-            if (toggleLook(recommendation, occasion, weather)) {
+            if (await toggleLook(recommendation, occasion, weather)) {
               haptic('success');
               setMessage({
                 text: wasSaved
                   ? 'Removed from saved looks.'
-                  : 'Saved on this device. Find it in You → Saved looks.',
+                  : isDemo ? 'Saved on this device. Find it in You → Saved looks.'
+                    : 'Saved to your account. Find it in You → Saved looks.',
                 error: false,
               });
             }
@@ -192,7 +212,9 @@ export function StylingStudio({
           detail={
             missingPieces(garments)
               ? 'Add ' + missingPieces(garments) + ' to build a complete look.'
-              : 'These pieces do not make a complete match for the current occasion and weather. Try another occasion, change the weather, or release your locks.'
+              : requireRainProtection && weather.raining
+                ? 'No complete look has both a coat and shoes that you marked water resistant. Turn off the rain requirement or add the missing pieces.'
+                : 'These pieces do not make a complete match for this occasion. Try another occasion, show skipped pieces, or release your locks.'
           }
           actionLabel={missingPieces(garments) ? 'Add a piece' : 'Reset this look'}
           onAction={() => {
@@ -227,15 +249,14 @@ export function StylingStudio({
         subtitle="A little thought behind the look."
         onClose={() => setExplanationOpen(false)}
       >
-        <AppText variant="bodyLarge">{recommendation?.explanation}</AppText>
+        {recommendation?.reasons?.slice(0, 3).map((reason, index) => (
+          <AppText key={reason.kind + index} variant="bodyLarge">{reason.text}</AppText>
+        )) ?? <AppText variant="bodyLarge">{recommendation?.explanation}</AppText>}
         <AppText variant="muted">
           Chosen for {label.toLowerCase()}, with {weather.raining ? 'rain' : 'dry conditions'} and{' '}
           {weather.temperatureF}°F in mind.
         </AppText>
-        <AppText variant="metadata">
-          Your chosen fits and aesthetics guide the combination. Wear history helps bring overlooked
-          pieces back into rotation.
-        </AppText>
+        <AppText variant="metadata">Only details you have recorded can support a specific claim. You can change any unlocked piece.</AppText>
       </BottomSheet>
       {selected && !swapping ? (
         <BottomSheet
@@ -271,6 +292,15 @@ export function StylingStudio({
             variant="secondary"
             disabled={state.lockedIds.includes(selected.id)}
             onPress={() => setSwapping(true)}
+          />
+          <Button
+            label="Skip this piece for this look"
+            variant="quiet"
+            disabled={state.lockedIds.includes(selected.id)}
+            onPress={() => {
+              setExcludedGarmentIds((ids) => [...new Set([...ids, selected.id])]);
+              closePiece();
+            }}
           />
           <Button
             label="View garment"

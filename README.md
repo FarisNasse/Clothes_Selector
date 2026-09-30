@@ -30,24 +30,28 @@ For iOS or Android, use Expo Go where supported or a development build when nati
 
 - Create, browse, edit, and delete structured garment records.
 - Optionally attach JPEG, PNG, or WebP photos to garments in connected mode.
-- Filter and search the wardrobe, and manage device-local saved looks and favorites.
-- Generate outfit candidates from the available wardrobe using deterministic compatibility rules and weighted scoring.
+- Filter and search the wardrobe. Saved looks and favorites sync for signed-in accounts; demo collections stay on the device.
+- Generate local outfit candidates with factual reason traces, quiet/expressive intent, one-look skips, and optional confirmed rain protection.
 - Lock a garment while exploring compatible outfits, record a worn outfit, and track garment wear counts.
 - Sign in with email and password and recover an account through Supabase Auth in connected mode.
+- Export account details as JSON and request account deletion through an authenticated server function. The JSON does not include photo bytes.
 
 See [product scope](docs/product/product-overview.md) for boundaries and known limitations.
 
 ## Connected mode
 
-Connected mode uses Supabase Auth, PostgreSQL, and private Storage. Apply the SQL migrations in `supabase/migrations` to a Supabase project before connecting the app. Set the client-safe values in `.env`:
+Connected mode uses Supabase Auth, PostgreSQL, private Storage, and the `delete-account` Edge Function. Apply the SQL migrations in `supabase/migrations` and deploy `supabase/functions/delete-account` to the intended project before connecting the app. Set the client-safe values in `.env`:
 
 ```dotenv
 EXPO_PUBLIC_DEMO_MODE=false
+EXPO_PUBLIC_APP_ENV=staging
 EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
 
 The Supabase URL and publishable key are client configuration, not secrets. Never put a service-role key, database password, or other privileged credential in an `EXPO_PUBLIC_*` variable or in the app bundle. See [local development](docs/development/local-development.md) and the [security model](docs/security/security-and-privacy.md).
+
+Connected mode deliberately has no built-in backend URL or key. A missing project setting fails at startup instead of reaching an unintended database. A production build also refuses demo mode. The EAS `staging` profile uses preview environment values; `production` uses production values. Supply each environment's distinct public URL and key in EAS before building.
 
 ## Quality checks
 

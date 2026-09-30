@@ -24,14 +24,16 @@ Expo reads `.env`; it does not load `.env.example` automatically. `.env` is igno
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `EXPO_PUBLIC_APP_ENV` | `development` | Informational environment label |
+| `EXPO_PUBLIC_APP_ENV` | `development` | Build environment label; `production` requires connected mode |
 | `EXPO_PUBLIC_DEMO_MODE` | demo enabled | Set to `false` to use connected data/auth |
-| `EXPO_PUBLIC_SUPABASE_URL` | Project default in `src/lib/env.ts` | Supabase project URL; override to target another project |
-| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Project default in `src/lib/env.ts` | Supabase publishable key; override to target another project |
+| `EXPO_PUBLIC_SUPABASE_URL` | none | Required project URL in connected mode |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | none | Required public client key in connected mode |
 
 Values prefixed `EXPO_PUBLIC_` are compiled into client code. Use only public client configuration. Never add a Supabase service-role key or database password here.
 
-The repository currently contains defaults for a Supabase project in `src/lib/env.ts`. Do not assume that project is an isolated development or staging environment. Use an explicitly provisioned project for your work and provide its client URL and publishable key through `.env`.
+There is no built-in Supabase project. Use a separate project for staging and production, and supply each URL and publishable key explicitly. Apply all migrations before pointing a connected build at the project. Deploy the `delete-account` Edge Function for the account-deletion control to work.
+
+EAS profiles set demo versus connected mode. Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the EAS `preview` environment for the `staging` build profile, and in `production` for the production profile. A staging app uses a distinct mobile application ID so it can sit alongside the release app. Test migration, Auth redirects, Storage, and the function on staging before promotion.
 
 ## Local Supabase
 
@@ -67,4 +69,4 @@ This script is PowerShell-specific. Review package and lockfile changes before c
 
 ## Photo flow
 
-Photos are optional. In connected mode, supported JPEG, PNG, and WebP files up to 12 MiB can be uploaded to the private bucket. Some browser HEIC/AVIF selections need to be exported as JPEG first. A failed photo read or upload should not erase entered garment details; the UI supports retry or saving without a photo. Demo photo selections are previews and do not sync.
+Photos are optional. In connected mode, supported JPEG, PNG, and WebP files up to 12 MiB can be uploaded to the private bucket. Native selections are decoded, resized when needed, and re-encoded before upload; the picker-provided supported bytes serve as a fallback if normalization fails. Browser images are normalized with canvas where supported. Some browser HEIC/AVIF selections need to be exported as JPEG first. A failed read or upload retains the draft, with retry or save-without-photo options. Verify Samsung Android, iPhone, Chrome, and Edge on real devices before release.

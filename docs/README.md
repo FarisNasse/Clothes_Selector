@@ -15,7 +15,10 @@ Use this page as the entry point for engineering and product documentation. The 
 ## Product
 
 - [Product overview](product/product-overview.md) — current goals, supported user journeys, and explicit non-goals.
+- [Design philosophy](product/design-philosophy.md) — how a recommendation should answer the wearer's day and explain its actual pieces.
 - [Demo script](product/demo-script.md) — a walkthrough of the currently implemented experience.
+- [Engineering roadmap](operations/product-engineering-roadmap.md) — the supplied prioritized plan and release gates.
+- [September implementation status](operations/implementation-status-2026-09-28.md) — what this revision implements, verifies, and still needs.
 
 ## Historical material
 

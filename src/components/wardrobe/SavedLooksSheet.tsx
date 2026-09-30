@@ -2,25 +2,29 @@ import { FlatList, View } from 'react-native';
 import { router } from 'expo-router';
 import { BottomSheet } from '@/components/sheets/BottomSheet';
 import { AppText } from '@/components/primitives/AppText';
+import { Notice } from '@/components/primitives/Notice';
 import { EmptyState } from '@/components/primitives/EmptyState';
 import { IconButton } from '@/components/primitives/IconButton';
 import { AnimatedPressable } from '@/components/motion/AnimatedPressable';
 import { GarmentImage } from '@/components/garment/GarmentImage';
 import { useCollection } from '@/providers/CollectionProvider';
+import { useSession } from '@/providers/SessionProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
 import { useExperience } from '@/providers/ExperienceProvider';
 export function SavedLooksSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const { looks, removeLook } = useCollection();
+  const { looks, removeLook, error, retry } = useCollection();
+  const { isDemo } = useSession();
   const { garments } = useWardrobe();
   const { colors: c } = useExperience();
   return (
     <BottomSheet
       visible={visible}
       title="Worth keeping."
-      subtitle="Saved looks live on this device, separately for each account."
+      subtitle={isDemo ? 'Demo looks stay on this device.' : 'Saved looks sync to your account.'}
       onClose={onClose}
       scroll={false}
     >
+      {error ? <Notice message={error} tone="error" action="Retry" onAction={retry} /> : null}
       <FlatList
         data={looks}
         keyExtractor={(look) => look.id}
@@ -81,7 +85,7 @@ export function SavedLooksSheet({ visible, onClose }: { visible: boolean; onClos
                 <IconButton
                   label="Remove saved look"
                   icon="bookmark"
-                  onPress={() => removeLook(item.id)}
+                  onPress={() => { void removeLook(item.id); }}
                 />
               </View>
             </View>

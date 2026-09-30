@@ -11,6 +11,8 @@ The canonical database schema is the ordered SQL migration history in `supabase/
 | `profiles` | User-facing account metadata | Primary key references `auth.users.id` |
 | `style_profiles` | Style preference data | One row per authenticated user |
 | `garments` | Structured user wardrobe items and optional Storage path | Each row has `user_id`; category and scoring fields are constrained |
+| `favorite_garments` | Synced favorite item keys | User and referenced garment ownership checked on insert |
+| `saved_looks` | Synced selected garment IDs and context | User and referenced garment ownership checked on insert |
 | `outfits` | Persisted outfit record | Each row has `user_id` |
 | `outfit_items` | Garments assigned to a persisted outfit | References outfit and garment; policies verify ownership |
 | `recommendation_sessions` | Context and candidate-count record | User-scoped; current generation flow does not persist sessions |
@@ -24,6 +26,7 @@ New Auth users receive a profile and style-profile row through the `handle_new_u
 1. `0001_initial_schema.sql` creates product tables, update triggers, initial-user provisioning, indexes, RLS, and ownership policies.
 2. `0002_private_garment_storage.sql` creates/configures the private `garment-images` bucket and user-folder policies. Allowed image MIME types are JPEG, PNG, and WebP; the configured limit is 12 MiB.
 3. `0003_record_wear_transaction.sql` adds the authenticated `record_outfit_wear` function and its atomic write path.
+4. `20260928111900_collection_sync_and_reference_ownership.sql` records confirmed garment fields, adds user-scoped collection tables, and prevents feedback and wear events from referencing another user's session or outfit.
 
 ## Local workflow
 

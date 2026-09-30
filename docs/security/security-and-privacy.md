@@ -10,7 +10,7 @@ The app may store account identifiers, garment attributes, optional garment phot
 
 Supabase URL and publishable key are client-side values. Any `EXPO_PUBLIC_*` value is public in the compiled application. Never put service-role keys, database passwords, signing secrets, or third-party private credentials in the app or repository. `.env` is ignored by Git; `.env.example` must contain placeholders only.
 
-The application currently includes default public Supabase client configuration in `src/lib/env.ts`. Before external distribution, confirm that the referenced project is the intended environment, has appropriate quotas and policies, and does not contain development data.
+Connected builds require an explicit project URL and publishable key. The EAS staging and production profiles use separate environment sets. Verify the actual target project and deployed migration state for each build.
 
 ## Authorization
 
@@ -18,18 +18,20 @@ The application currently includes default public Supabase client configuration 
 - Storage bucket `garment-images` is private. Policies restrict object access to the authenticated user's UUID folder.
 - Connected photo display uses short-lived signed URLs; do not log or share these URLs.
 - `record_outfit_wear` runs as an authenticated invoker, checks that supplied garments belong to the caller, and writes the related records in one transaction.
+- The collection migration adds user-scoped favorites and saved looks and requires ownership of referenced garments, sessions, and outfits on insert.
+- The `delete-account` function verifies a signed-in caller, deletes their private photo objects, then deletes that Auth user. Its server-only admin credential never enters the client.
 - Client-side checks improve usability but do not replace database and Storage authorization.
 
 These controls should be verified with automated tests using at least two independent users before beta. Schema presence alone is not proof that deployed policies match the repository.
 
 ## Photo handling
 
-The bucket accepts JPEG, PNG, and WebP, with a 12 MiB limit. Photos are optional and saved to private Storage in connected mode. The app does not send photos to an AI provider. Review image metadata handling and retention behavior before release; this repository does not document a completed metadata stripping pipeline.
+The bucket accepts JPEG, PNG, and WebP, with a 12 MiB limit. Photos are optional and saved to private Storage in connected mode. The app does not send photos to an AI provider. The native normalizer and browser canvas can re-encode photos without original camera metadata. If normalization fails, a supported picker-provided native image or browser original may be used; this fallback can retain metadata. Verify behavior and decide whether to block fallback before release.
 
 ## Current privacy gaps
 
-- No complete in-app account deletion and storage-cleanup flow.
-- No user-facing data export or retention controls.
+- Account deletion needs deployment, interrupted-cleanup and cross-account tests before it can be treated as complete. An issued access token can remain valid until expiry after Auth deletion.
+- The user-facing JSON export contains account rows and image paths, but no image bytes; a complete photo export and retention policy are still needed.
 - No published privacy policy or store data-safety disclosure in this repository.
 - No documented incident response or production backup/restore procedure.
 - No CI dependency/secret scanning or automated cross-user RLS/Storage tests are configured in the current workflow.

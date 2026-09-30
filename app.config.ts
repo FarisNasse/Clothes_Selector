@@ -1,7 +1,8 @@
 import type { ExpoConfig } from 'expo/config';
 
+const staging = process.env.EXPO_PUBLIC_APP_ENV === 'staging';
 const config: ExpoConfig = {
-  name: 'Clothes Selector',
+  name: staging ? 'Clothes Selector Staging' : 'Clothes Selector',
   slug: 'clothes-selector',
   scheme: 'clothesselector',
   version: '0.1.0',
@@ -13,10 +14,10 @@ const config: ExpoConfig = {
   runtimeVersion: { policy: 'appVersion' },
   ios: {
     supportsTablet: true,
-    bundleIdentifier: 'com.farisnasse.clothesselector',
+    bundleIdentifier: staging ? 'com.farisnasse.clothesselector.staging' : 'com.farisnasse.clothesselector',
   },
   android: {
-    package: 'com.farisnasse.clothesselector',
+    package: staging ? 'com.farisnasse.clothesselector.staging' : 'com.farisnasse.clothesselector',
     adaptiveIcon: { foregroundImage: './assets/brand/icon.png', backgroundColor: '#20362C' },
   },
   web: {

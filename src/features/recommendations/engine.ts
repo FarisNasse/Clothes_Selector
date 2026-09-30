@@ -3,18 +3,20 @@ import type {
   Occasion,
   OutfitRecommendation,
   OutfitScoreBreakdown,
+  OutfitReason,
   StyleProfile,
+  StylingIntent,
   WeatherContext,
 } from '@/types/domain';
 import { canonicalColor, colorSwatches } from '@/features/wardrobe/catalog';
 
 const weights: Record<keyof OutfitScoreBreakdown, number> = {
-  colorHarmony: 0.25,
-  personalPreference: 0.2,
-  silhouetteCompatibility: 0.15,
+  colorHarmony: 0.14,
+  personalPreference: 0.28,
+  silhouetteCompatibility: 0.11,
   formalityConsistency: 0.1,
-  occasionSuitability: 0.1,
-  weatherSuitability: 0.1,
+  occasionSuitability: 0.14,
+  weatherSuitability: 0.13,
   textureCompatibility: 0.05,
   wardrobeRotation: 0.05,
 };
@@ -39,6 +41,9 @@ export type GenerateOutfitInput = {
   styleProfile: StyleProfile;
   lockedGarmentId?: string;
   lockedGarmentIds?: string[];
+  excludedGarmentIds?: string[];
+  intent?: StylingIntent;
+  requireRainProtection?: boolean;
   limit?: number;
   now?: Date;
 };
@@ -52,6 +57,12 @@ function average(values: number[]) {
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
+}
+
+function confirmed(garment: Garment, field: 'fit' | 'formality' | 'warmth' | 'waterproof' | 'seasons') {
+  // Fixtures and older callers without provenance keep their recorded values;
+  // connected rows carry an explicit list, so unchanged form defaults stay unknown.
+  return garment.confirmedFields === undefined || garment.confirmedFields.includes(field);
 }
 
 function colorAttributes(raw: string) {
@@ -99,12 +110,8 @@ function colorHarmonyScore(garments: Garment[]) {
     }
   }
 
-  const unique = new Set(colors.map((item) => item.color)).size;
-  const accents = colors.filter((item) => !item.neutral && item.saturation > 0.28).length;
-  // Moderate coordination: preserve tonal looks, but give one accent room to breathe.
-  return clamp01((pairCount ? pairScore / pairCount : 1) -
-    (unique === 1 && colors.length >= 3 ? 0.1 : 0) -
-    (accents > 2 ? 0.07 * (accents - 2) : 0));
+  // This is one weak signal, not a rule against tonal or expressive dressing.
+  return clamp01(pairCount ? pairScore / pairCount : 1);
 }
 
 function preferenceScore(garments: Garment[], profile: StyleProfile) {
@@ -115,7 +122,7 @@ function preferenceScore(garments: Garment[], profile: StyleProfile) {
       0.45,
       ...garment.styleTags.map((tag) => profile.styleWeights[tag.toLowerCase()] ?? 0.45),
     );
-    const fitBoost = profile.preferredFits.includes(garment.fit) ? 0.1 : 0;
+    const fitBoost = confirmed(garment, 'fit') && profile.preferredFits.includes(garment.fit) ? 0.1 : 0;
     return clamp01(styleScore + fitBoost);
   });
 
@@ -125,6 +132,7 @@ function preferenceScore(garments: Garment[], profile: StyleProfile) {
 function silhouetteScore(garments: Garment[]) {
   const fits = garments
     .filter((garment) => garment.category !== 'footwear')
+    .filter((garment) => confirmed(garment, 'fit'))
     .map((garment) => garment.fit);
   if (fits.length < 2) return 0.9;
 
@@ -138,7 +146,8 @@ function silhouetteScore(garments: Garment[]) {
 }
 
 function formalityConsistencyScore(garments: Garment[]) {
-  const values = garments.filter((garment) => garment.category !== 'accessory').map((garment) => garment.formality);
+  const values = garments.filter((garment) => garment.category !== 'accessory' && confirmed(garment, 'formality')).map((garment) => garment.formality);
+  if (values.length < 2) return 0.8;
   const spread = Math.max(...values) - Math.min(...values);
   if (spread <= 2) return 1;
   if (spread <= 3) return 0.82;
@@ -148,7 +157,9 @@ function formalityConsistencyScore(garments: Garment[]) {
 
 function occasionScore(garments: Garment[], occasion: Occasion) {
   const target = occasionTargets[occasion];
-  const outfitFormality = average(garments.filter((item) => item.category !== 'accessory').map((garment) => garment.formality));
+  const known = garments.filter((item) => item.category !== 'accessory' && confirmed(item, 'formality'));
+  if (known.length === 0) return 0.65;
+  const outfitFormality = average(known.map((garment) => garment.formality));
   if (outfitFormality < target.min || outfitFormality > target.max) return 0.35;
   return clamp01(1 - Math.abs(outfitFormality - target.target) / 5);
 }
@@ -156,19 +167,20 @@ function occasionScore(garments: Garment[], occasion: Occasion) {
 function weatherScore(garments: Garment[], weather: WeatherContext) {
   const outerwear = garments.find((garment) => garment.category === 'outerwear');
   const footwear = garments.find((garment) => garment.category === 'footwear');
-  const avgWarmth = average(garments.filter((item) => item.category !== 'accessory').map((garment) => garment.warmth));
+  const knownWarmth = garments.filter((item) => item.category !== 'accessory' && confirmed(item, 'warmth'));
+  const avgWarmth = average(knownWarmth.map((garment) => garment.warmth));
 
   let score = 1;
 
-  if (weather.temperatureF >= 78 && avgWarmth > 4.5) score -= 0.5;
-  if (weather.temperatureF <= 50 && avgWarmth < 3.5) score -= 0.35;
-  if (weather.temperatureF <= 42 && !outerwear && avgWarmth < 6) score -= 0.3;
-  if (weather.raining && outerwear && !outerwear.waterproof) score -= 0.22;
+  if (knownWarmth.length && weather.temperatureF >= 78 && avgWarmth > 4.5) score -= 0.5;
+  if (knownWarmth.length && weather.temperatureF <= 50 && avgWarmth < 3.5) score -= 0.35;
+  if (knownWarmth.length && weather.temperatureF <= 42 && !outerwear && avgWarmth < 6) score -= 0.3;
+  if (weather.raining && outerwear && confirmed(outerwear, 'waterproof') && !outerwear.waterproof) score -= 0.22;
   if (weather.raining && !outerwear) score -= 0.12;
-  if (weather.raining && footwear && !footwear.waterproof) score -= 0.16;
+  if (weather.raining && footwear && confirmed(footwear, 'waterproof') && !footwear.waterproof) score -= 0.16;
   const season = weather.temperatureF >= 75 ? 'summer' : weather.temperatureF <= 42 ? 'winter' : null;
   if (season) score -= Math.min(0.35, garments.filter((item) =>
-    item.category !== 'accessory' && !item.seasons.includes(season) &&
+    item.category !== 'accessory' && confirmed(item, 'seasons') && !item.seasons.includes(season) &&
     !item.seasons.includes('all-season')).length * 0.12);
 
   return clamp01(score);
@@ -200,21 +212,26 @@ function rotationScore(garments: Garment[], nowDate: Date) {
   );
 }
 
-function isHardCompatible(candidate: Candidate, occasion: Occasion, weather: WeatherContext) {
-  const values = candidate.filter((garment) => garment.category !== 'accessory').map((garment) => garment.formality);
-  if (Math.max(...values) - Math.min(...values) > 4) return false;
+function isHardCompatible(candidate: Candidate, occasion: Occasion, weather: WeatherContext, requireRainProtection = false) {
+  if (requireRainProtection && weather.raining) {
+    const coat = candidate.find((item) => item.category === 'outerwear');
+    const shoes = candidate.find((item) => item.category === 'footwear');
+    if (!coat || !shoes || !confirmed(coat, 'waterproof') || !coat.waterproof ||
+      !confirmed(shoes, 'waterproof') || !shoes.waterproof) return false;
+  }
 
   if (occasion === 'formal') {
     const footwear = candidate.find((garment) => garment.category === 'footwear');
     const top = candidate.find((garment) => garment.category === 'top');
     const bottom = candidate.find((garment) => garment.category === 'bottom');
-    if (!footwear || footwear.formality < 6 || !top || top.formality < 6 ||
-      (bottom && (bottom.formality < 6 || /shorts/i.test(bottom.subcategory)))) return false;
+    if (!footwear || (confirmed(footwear, 'formality') && footwear.formality < 6) ||
+      !top || (confirmed(top, 'formality') && top.formality < 6) ||
+      (bottom && ((confirmed(bottom, 'formality') && bottom.formality < 6) || /shorts/i.test(bottom.subcategory)))) return false;
   }
 
   if (weather.temperatureF >= 82) {
     const tooHeavy = candidate.some(
-      (garment) => garment.category === 'outerwear' && garment.warmth >= 7,
+      (garment) => garment.category === 'outerwear' && confirmed(garment, 'warmth') && garment.warmth >= 7,
     );
     if (tooHeavy) return false;
   }
@@ -228,6 +245,7 @@ function scoreCandidate(
   weather: WeatherContext,
   styleProfile: StyleProfile,
   now: Date,
+  intent: StylingIntent,
 ): { score: number; breakdown: OutfitScoreBreakdown } {
   const breakdown: OutfitScoreBreakdown = {
     colorHarmony: colorHarmonyScore(garments),
@@ -245,41 +263,50 @@ function scoreCandidate(
     0,
   );
 
-  return { score: Math.round(weighted * 100), breakdown };
+  const prominent = garments.filter((item) =>
+    (item.pattern && !['solid', 'unknown'].includes(item.pattern.toLowerCase())) ||
+    (!colorAttributes(item.primaryColor).neutral && colorAttributes(item.primaryColor).saturation > 0.28),
+  ).length;
+  const intentAdjustment = intent === 'quiet' ? -Math.max(0, prominent - 1) * 0.07
+    : intent === 'expressive' ? Math.min(prominent, 3) * 0.04 : 0;
+  return { score: Math.round(clamp01(weighted + intentAdjustment) * 100), breakdown };
 }
 
-function explain(garments: Garment[], breakdown: OutfitScoreBreakdown, occasion: Occasion) {
+function explain(garments: Garment[], occasion: Occasion, weather: WeatherContext, intent: StylingIntent): OutfitReason[] {
   const top = garments.find((garment) => garment.category === 'top');
-  const bottom = garments.find((garment) => garment.category === 'bottom');
+  const bottom = garments.find((garment) => garment.category === 'bottom' || garment.category === 'suit');
   const footwear = garments.find((garment) => garment.category === 'footwear');
-
-  const reasons: string[] = [];
-  if (top && bottom && breakdown.colorHarmony >= 0.88) {
-    reasons.push(
-      `${top.primaryColor} and ${bottom.primaryColor} create a controlled, versatile palette`,
-    );
+  const reasons: OutfitReason[] = [];
+  if (top && bottom) reasons.push({ kind: 'palette', garmentIds: [top.id, bottom.id],
+    text: top.primaryColor.toLowerCase() === bottom.primaryColor.toLowerCase()
+      ? `Your ${top.name} and ${bottom.name} repeat ${top.primaryColor} for a tonal look.`
+      : `Your ${top.name} (${top.primaryColor}) pairs with your ${bottom.name} (${bottom.primaryColor}).`,
+  });
+  const patterns = garments.filter((item) => item.pattern && !['solid', 'unknown'].includes(item.pattern.toLowerCase()));
+  if (patterns.length === 1 && patterns[0]) {
+    const item = patterns[0];
+    reasons.push({ kind: 'pattern', garmentIds: [item.id],
+      text: `The ${item.pattern} on your ${item.name} is the look's recorded pattern.`,
+    });
   }
-  if (footwear && breakdown.textureCompatibility >= 0.9) {
-    reasons.push(
-      `${footwear.name.toLowerCase()} adds useful texture without disrupting the silhouette`,
-    );
+  const coat = garments.find((item) => item.category === 'outerwear');
+  if (weather.raining && coat && footwear && coat.waterproof && footwear.waterproof &&
+    confirmed(coat, 'waterproof') && confirmed(footwear, 'waterproof')) {
+    reasons.push({ kind: 'rain', garmentIds: [coat.id, footwear.id],
+      text: `Your ${coat.name} and ${footwear.name} are both marked water resistant for the rain you set.`,
+    });
   }
-  if (garments.some((garment) => !['solid', 'unknown'].includes(garment.pattern.toLowerCase())) &&
-    breakdown.textureCompatibility >= 0.9) {
-    reasons.push('a single pattern gives the look a focal point');
-  }
-  if (breakdown.weatherSuitability >= 0.88 && garments.some((garment) => garment.waterproof)) {
-    reasons.push('the weather-ready pieces suit the conditions');
-  }
-  if (breakdown.wardrobeRotation >= 0.75) {
-    reasons.push('the combination brings less-used pieces back into rotation');
-  }
-
-  const lead =
-    reasons.length > 0
-      ? reasons.slice(0, 2).join(', while ')
-      : 'the pieces share a consistent level of formality';
-  return `${lead}. The overall balance is tuned for ${occasion.replace('_', ' ')} with pieces you already own.`;
+  if (footwear?.materials.length) reasons.push({ kind: 'material', garmentIds: [footwear.id],
+    text: `Your ${footwear.name} is recorded as ${footwear.materials[0]}.`,
+  });
+  const unworn = garments.find((item) => item.wearCount === 0 && item.lastWornAt === null);
+  if (unworn) reasons.push({ kind: 'rotation', garmentIds: [unworn.id],
+    text: `Your ${unworn.name} has no recorded wears yet.`,
+  });
+  if (intent !== 'balanced') reasons.push({ kind: 'intent', garmentIds: garments.map((item) => item.id),
+    text: `You asked for a ${intent === 'quiet' ? 'quieter' : 'more expressive'} option for ${occasion.replace('_', ' ')}.`,
+  });
+  return reasons;
 }
 
 type Slot = (Garment | undefined)[];
@@ -341,7 +368,7 @@ function* buildCandidates(wardrobe: Garment[], lockedIds: string[]): Generator<G
 
 export type OutfitContext = Pick<
   GenerateOutfitInput,
-  'occasion' | 'weather' | 'styleProfile' | 'now'
+  'occasion' | 'weather' | 'styleProfile' | 'now' | 'intent' | 'requireRainProtection' | 'excludedGarmentIds'
 >;
 export function outfitKey(ids: string[]): string {
   return [...ids].sort().join(':');
@@ -353,6 +380,7 @@ export function evaluateOutfit(
   context: OutfitContext,
 ): OutfitRecommendation | null {
   const categories = new Set(garments.map((item) => item.category));
+  if (garments.some((item) => context.excludedGarmentIds?.includes(item.id))) return null;
   const complete =
     categories.has('top') &&
     categories.has('footwear') &&
@@ -365,20 +393,24 @@ export function evaluateOutfit(
     return null;
   if (categories.has('suit') && (categories.has('bottom') || categories.has('outerwear')))
     return null;
-  if (!isHardCompatible(garments, context.occasion, context.weather)) return null;
+  if (!isHardCompatible(garments, context.occasion, context.weather, context.requireRainProtection)) return null;
   const { score, breakdown } = scoreCandidate(
     garments,
     context.occasion,
     context.weather,
     context.styleProfile,
     context.now ?? new Date(),
+    context.intent ?? 'balanced',
   );
+  const reasons = explain(garments, context.occasion, context.weather, context.intent ?? 'balanced');
   return {
     id: outfitKey(garments.map((item) => item.id)),
     garments,
     score,
     breakdown,
-    explanation: explain(garments, breakdown, context.occasion),
+    reasons,
+    explanation: reasons.slice(0, 2).map((reason) => reason.text).join(' ') ||
+      `Your ${garments.map((item) => item.name).join(', ')} make a complete look for ${context.occasion.replace('_', ' ')}.`,
   };
 }
 
@@ -389,14 +421,18 @@ export function generateOutfits({
   styleProfile,
   lockedGarmentId,
   lockedGarmentIds = [],
+  excludedGarmentIds = [],
+  intent = 'balanced',
+  requireRainProtection = false,
   limit = 3,
   now = new Date(),
 }: GenerateOutfitInput): OutfitRecommendation[] {
   if (limit <= 0 || !Number.isFinite(limit)) return [];
   const locks = [...new Set([...lockedGarmentIds, ...(lockedGarmentId ? [lockedGarmentId] : [])])];
+  if (locks.some((id) => excludedGarmentIds.includes(id))) return [];
   const ranked: OutfitRecommendation[] = [];
-  for (const candidate of buildCandidates(wardrobe, locks)) {
-    const recommendation = evaluateOutfit(candidate, { occasion, weather, styleProfile, now });
+  for (const candidate of buildCandidates(wardrobe.filter((item) => !excludedGarmentIds.includes(item.id)), locks)) {
+    const recommendation = evaluateOutfit(candidate, { occasion, weather, styleProfile, now, intent, requireRainProtection, excludedGarmentIds });
     if (recommendation) ranked.push(recommendation);
   }
   ranked.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));

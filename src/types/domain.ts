@@ -14,6 +14,8 @@ export type Occasion = (typeof occasions)[number];
 
 export type Fit = 'slim' | 'tailored' | 'regular' | 'relaxed' | 'oversized';
 export type Season = 'spring' | 'summer' | 'fall' | 'winter' | 'all-season';
+export type ConfirmedGarmentField = 'fit' | 'formality' | 'warmth' | 'waterproof' | 'seasons';
+export type StylingIntent = 'quiet' | 'balanced' | 'expressive';
 
 export type Garment = {
   id: string;
@@ -38,6 +40,8 @@ export type Garment = {
   wearCount: number;
   lastWornAt: string | null;
   aiConfidence: number | null;
+  /** Details explicitly chosen by the wearer. Missing means legacy/demo inventory. */
+  confirmedFields?: ConfirmedGarmentField[] | undefined;
 };
 
 export type WeatherContext = {
@@ -69,6 +73,13 @@ export type OutfitRecommendation = {
   score: number;
   breakdown: OutfitScoreBreakdown;
   explanation: string;
+  reasons?: OutfitReason[];
+};
+
+export type OutfitReason = {
+  kind: 'palette' | 'pattern' | 'material' | 'rain' | 'rotation' | 'context' | 'intent';
+  garmentIds: string[];
+  text: string;
 };
 
 export type GarmentDraft = Omit<Garment, 'id' | 'userId' | 'wearCount' | 'lastWornAt'>;

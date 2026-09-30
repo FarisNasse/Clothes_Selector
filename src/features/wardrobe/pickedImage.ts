@@ -3,11 +3,29 @@ import { decode } from 'base64-arraybuffer';
 
 export const MAX_GARMENT_IMAGE_BYTES = 12 * 1024 * 1024;
 
+export type GarmentImageErrorKind = 'read' | 'size' | 'format' | 'network' | 'auth' | 'policy' | 'upload';
 export class GarmentImageError extends Error {
-  constructor(public readonly kind: 'read' | 'size' | 'format' | 'upload', cause?: unknown) {
+  constructor(public readonly kind: GarmentImageErrorKind, cause?: unknown) {
     super(kind, { cause });
     this.name = 'GarmentImageError';
   }
+}
+
+export function classifyPhotoUploadError(error: unknown): GarmentImageError {
+  const detail = error && typeof error === 'object' ? error as {
+    status?: number | string; statusCode?: number | string; message?: string; code?: string;
+  } : {};
+  const status = Number(detail.status ?? detail.statusCode);
+  const message = String(detail.message ?? '').toLowerCase();
+  if (status === 401 || /jwt|token expired|not authenticated/.test(message))
+    return new GarmentImageError('auth', error);
+  if (status === 403 || /row.level.security|permission denied|policy/.test(message))
+    return new GarmentImageError('policy', error);
+  if (status === 413 || /too large|payload too large|file size/.test(message))
+    return new GarmentImageError('size', error);
+  if (/fetch|network|timeout|offline/i.test(message))
+    return new GarmentImageError('network', error);
+  return new GarmentImageError('upload', error);
 }
 
 function imageMime(bytes: Uint8Array): 'image/jpeg' | 'image/png' | 'image/webp' | null {
@@ -54,5 +72,8 @@ export function photoErrorMessage(failure: unknown) {
     case 'format': return 'This photo format cannot be uploaded. Choose or export a JPEG, PNG, or WebP image.';
     case 'read': return 'We could not read this photo. Choose another or export it as a JPEG.';
     case 'upload': return 'We could not upload the photo. Check your connection and sign-in, then retry.';
+    case 'network': return 'The photo could not reach your wardrobe. Check your connection and retry, or save without it.';
+    case 'auth': return 'Your sign-in expired. Sign in again, then retry the photo.';
+    case 'policy': return 'The photo was refused by private storage. Check this account’s storage setup, or save without it.';
   }
 }

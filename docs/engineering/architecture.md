@@ -28,12 +28,12 @@ Screens should use feature/provider interfaces rather than embedding Supabase qu
 
 ## Demo and connected behavior
 
-`EXPO_PUBLIC_DEMO_MODE` is enabled unless its value is exactly `false`.
+`EXPO_PUBLIC_DEMO_MODE` is enabled unless its value is exactly `false`. Connected mode needs an explicitly selected project; production mode rejects demo configuration.
 
 - **Demo mode:** uses `src/fixtures/demoWardrobe.ts`; garment edits and additions are session-only. Device-local saved looks and favorites use the platform storage adapter and have separate persistence behavior.
-- **Connected mode:** uses Supabase Auth and repositories for wardrobe/style data. Garment photos are stored in the private `garment-images` bucket. Signed URLs are created for display and cached in memory.
+- **Connected mode:** uses Supabase Auth and repositories for wardrobe/style/collection data. Garment photos are stored in the private `garment-images` bucket. Signed URLs are created for display and cached in memory. Account deletion uses an authenticated server function.
 
-Appearance/accessibility preferences and local collections use device storage; they do not sync to Supabase. See [local development](../development/local-development.md) for environment variables and the [data model](data-model.md) for persisted entities.
+Appearance/accessibility preferences remain device-local. Demo collections are device-local; connected collections sync and keep a local cache. See [local development](../development/local-development.md) for environment variables and the [data model](data-model.md) for persisted entities.
 
 ## Recommendation flow
 
@@ -49,7 +49,7 @@ SQL migrations in `supabase/migrations` define profiles, style profiles, garment
 
 - The mobile app communicates directly with Supabase; no server-side API boundary is present.
 - Recommendation-session persistence and candidate lineage are not wired into the current generation flow.
-- Saved looks/favorites are device-local and do not synchronize across devices.
+- Collection sync still needs two-device conflict and policy testing on staging.
 - Weather context is user-provided; no live weather provider or location integration is configured.
-- Analytics, crash reporting, remote feature flags, and account deletion/export workflows are not implemented as complete product services.
+- Analytics, crash reporting, remote feature flags, full photo export, and a retention policy are not configured.
 - Device builds and accessibility behavior require real-device verification; CI does not validate them.

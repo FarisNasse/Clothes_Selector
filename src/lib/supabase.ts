@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 
 import { env } from '@/lib/env';
 
-export const supabase = env.isSupabaseConfigured
+export const supabase = !env.demoMode && env.isSupabaseConfigured
   ? createClient(env.supabaseUrl, env.supabasePublishableKey, {
       auth: {
         storage: localStorage,

@@ -18,6 +18,7 @@ export const garmentDraftSchema = z.object({
   storagePath: z.string().nullable(),
   purchasePrice: z.number().finite().nonnegative().nullable(),
   aiConfidence: z.number().min(0).max(1).nullable(),
+  confirmedFields: z.array(z.enum(['fit', 'formality', 'warmth', 'waterproof', 'seasons'])).optional(),
 });
 export function parseLabels(raw: string) {
   return [

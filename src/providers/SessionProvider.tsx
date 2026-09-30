@@ -5,6 +5,7 @@ import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 
 import { friendlyAuthError } from '@/features/auth/errors';
+import { collectionKey } from '@/features/collections/storage';
 import { env } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
 
@@ -17,6 +18,7 @@ type SessionContextValue = {
   requestPasswordReset: (email: string) => Promise<string | null>;
   updatePassword: (password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -118,6 +120,20 @@ export function SessionProvider({ children }: PropsWithChildren) {
           const { error } = await supabase.auth.signOut();
           if (error) throw error;
         }
+      },
+      deleteAccount: async () => {
+        if (!supabase || !session?.user.id) throw new Error('Sign in again before deleting your account.');
+        const owner = session.user.id;
+        const { data, error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+        if (error || data?.deleted !== true) throw error ?? new Error('Account deletion did not finish.');
+        // A deleted user's refresh token cannot be used again. Clear the local
+        // session and both generations of device collections immediately.
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+        setSession(null);
+        try {
+          localStorage.removeItem(collectionKey(owner));
+          localStorage.removeItem(collectionKey('account-cache:' + owner));
+        } catch { /* Account rows and photos were deleted server-side. */ }
       },
     }),
     [loading, session],

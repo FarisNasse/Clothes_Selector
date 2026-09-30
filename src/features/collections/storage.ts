@@ -19,6 +19,10 @@ const lookSchema = z.object({
 });
 const schema = z.object({ favorites: z.array(z.string()), looks: z.array(lookSchema) });
 export type SavedLook = z.infer<typeof lookSchema>;
+export function parseSavedLook(value: unknown): SavedLook | null {
+  const result = lookSchema.safeParse(value);
+  return result.success ? result.data : null;
+}
 export type Collection = z.infer<typeof schema>;
 export const emptyCollection = (): Collection => ({ favorites: [], looks: [] });
 export type DeviceStorage = Pick<Storage, 'getItem' | 'setItem'>;

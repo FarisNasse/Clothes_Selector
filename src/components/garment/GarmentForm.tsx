@@ -7,7 +7,7 @@ import { IconButton } from '@/components/primitives/IconButton';
 import { TextField } from '@/components/primitives/TextField';
 import { parseLabels } from '@/features/wardrobe/validation';
 import { colorGroups, garmentTypes } from '@/features/wardrobe/catalog';
-import { garmentCategories, type Fit, type GarmentDraft, type Season } from '@/types/domain';
+import { garmentCategories, type ConfirmedGarmentField, type Fit, type GarmentDraft, type Season } from '@/types/domain';
 const fits: Fit[] = ['slim', 'tailored', 'regular', 'relaxed', 'oversized'];
 const seasons: Season[] = ['spring', 'summer', 'fall', 'winter', 'all-season'];
 const patterns = ['solid', 'stripe', 'pinstripe', 'check', 'plaid', 'houndstooth', 'herringbone', 'floral', 'graphic'];
@@ -16,7 +16,12 @@ type Props = { value: GarmentDraft; onChange: (next: GarmentDraft) => void; disa
 export function GarmentForm({ value, onChange, disabled = false, step = 'all' }: Props) {
   const [advanced, setAdvanced] = useState(false);
   function update<K extends keyof GarmentDraft>(key: K, next: GarmentDraft[K]) {
-    if (!disabled) onChange({ ...value, [key]: next });
+    if (!disabled) {
+      const confirmedFields = ['fit', 'formality', 'warmth', 'waterproof', 'seasons'].includes(key)
+        ? [...new Set([...(value.confirmedFields ?? []), key as ConfirmedGarmentField])]
+        : value.confirmedFields;
+      onChange({ ...value, [key]: next, confirmedFields });
+    }
   }
   return (
     <View style={{ gap: 24 }}>
@@ -84,7 +89,7 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
         />
       </View>
       <View style={{ gap: 10 }}>
-        <AppText variant="eyebrow">Fit · starts at regular; check this value</AppText>
+        <AppText variant="eyebrow">Fit · {value.confirmedFields?.includes('fit') ? 'confirmed' : 'regular is an unconfirmed starting point'}</AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {fits.map((fit) => (
             <Chip
@@ -99,7 +104,7 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
       </> : null}
       {step !== 'essentials' ? <>
       <Rating
-        label="Dressiness · starts at 5"
+        label={'Dressiness · ' + (value.confirmedFields?.includes('formality') ? 'confirmed' : '5 is unconfirmed')}
         value={value.formality}
         low="Everyday"
         high="Formal"
@@ -107,7 +112,7 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
         onChange={(number) => update('formality', number)}
       />
       <Rating
-        label="Warmth · starts at 5"
+        label={'Warmth · ' + (value.confirmedFields?.includes('warmth') ? 'confirmed' : '5 is unconfirmed')}
         value={value.warmth}
         low="Light"
         high="Cozy"
@@ -115,7 +120,7 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
         onChange={(number) => update('warmth', number)}
       />
       <View style={{ gap: 10 }}>
-        <AppText variant="eyebrow">Season</AppText>
+        <AppText variant="eyebrow">Season · {value.confirmedFields?.includes('seasons') ? 'confirmed' : 'all-season is unconfirmed'}</AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {seasons.map((season) => (
             <Chip
@@ -140,10 +145,10 @@ export function GarmentForm({ value, onChange, disabled = false, step = 'all' }:
         </View>
       </View>
       <View style={{ gap: 10 }}>
-        <AppText variant="eyebrow">Weather</AppText>
+        <AppText variant="eyebrow">Rain protection · {value.confirmedFields?.includes('waterproof') ? 'confirmed' : 'unknown until selected'}</AppText>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <Chip
-            label="Dry days"
+            label="Not water resistant"
             selected={!value.waterproof}
             onPress={disabled ? undefined : () => update('waterproof', false)}
           />

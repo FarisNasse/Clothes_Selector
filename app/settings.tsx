@@ -8,19 +8,26 @@ import { AppText } from '@/components/primitives/AppText';
 import { Button } from '@/components/primitives/Button';
 import { Chip } from '@/components/primitives/Chip';
 import { Notice } from '@/components/primitives/Notice';
+import { TextField } from '@/components/primitives/TextField';
 import { AnimatedPressable } from '@/components/motion/AnimatedPressable';
 import { BottomSheet } from '@/components/sheets/BottomSheet';
 import { SavedLooksSheet } from '@/components/wardrobe/SavedLooksSheet';
 import { useExperience } from '@/providers/ExperienceProvider';
 import { useSession } from '@/providers/SessionProvider';
 import { useCollection } from '@/providers/CollectionProvider';
+import { buildAccountExport, shareAccountExport } from '@/features/account/export';
 
 export default function SettingsScreen() {
-  const { session, isDemo, signOut } = useSession();
-  const { looks, error: collectionError } = useCollection();
+  const { session, isDemo, signOut, deleteAccount } = useSession();
+  const { looks, error: collectionError, retry: retryCollections, importAvailable, importFromDevice } = useCollection();
   const { colors: c, preferences, updatePreferences } = useExperience();
-  const [sheet, setSheet] = useState<'appearance' | 'privacy' | 'about' | 'saved' | null>(null);
+  const [sheet, setSheet] = useState<'appearance' | 'privacy' | 'about' | 'saved' | 'delete' | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deletePhrase, setDeletePhrase] = useState('');
+  const [dataMessage, setDataMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const name = isDemo
     ? 'The demo wardrobe'
@@ -59,7 +66,7 @@ export default function SettingsScreen() {
         <SettingRow
           icon="bookmark-outline"
           title="Saved looks"
-          detail={looks.length + ' saved on this device'}
+          detail={looks.length + (isDemo ? ' saved on this device' : ' synced with your account')}
           onPress={() => setSheet('saved')}
         />
         <SettingRow
@@ -79,6 +86,17 @@ export default function SettingsScreen() {
           onPress={() => setSheet('appearance')}
         />
       </View>
+      {!isDemo && importAvailable ? <View style={{ marginTop: 18, gap: 8 }}>
+        <AppText variant="muted">An earlier version saved looks and favorites on this device. Import the pieces that are still in your wardrobe.</AppText>
+        <Button label="Import older saved items" variant="secondary" loading={importing}
+          onPress={async () => {
+            setImporting(true);
+            setDataMessage(null);
+            const count = await importFromDevice();
+            if (count) setDataMessage(`Imported ${count} saved items to your account.`);
+            setImporting(false);
+          }} />
+      </View> : null}
       <View style={{ marginTop: 30, gap: 8 }}>
         <AppText variant="eyebrow">Make yourself comfortable</AppText>
         {Platform.OS !== 'web' ? (
@@ -132,6 +150,19 @@ export default function SettingsScreen() {
           detail="Understand what is stored and where"
           onPress={() => setSheet('privacy')}
         />
+        {!isDemo ? <SettingRow icon="download-outline" title="Export account details"
+          detail={exporting ? 'Preparing your JSON copy…' : 'Download a JSON copy of your wardrobe and activity'}
+          onPress={async () => {
+            if (exporting) return;
+            setExporting(true);
+            setError(null);
+            try {
+              await shareAccountExport(await buildAccountExport());
+              setDataMessage('Account details exported. Photo files are not included in the JSON.');
+            } catch {
+              setError('Could not export your account. Check your connection and try again.');
+            } finally { setExporting(false); }
+          }} /> : null}
         <SettingRow
           icon="sunny-outline"
           title="Weather"
@@ -145,10 +176,11 @@ export default function SettingsScreen() {
           onPress={() => setSheet('about')}
         />
       </View>
-      {collectionError ? <Notice message={collectionError} tone="error" /> : null}
+      {collectionError ? <Notice message={collectionError} tone="error" action="Retry" onAction={retryCollections} /> : null}
       {error ? <Notice message={error} tone="error" /> : null}
+      {dataMessage ? <Notice message={dataMessage} tone="success" /> : null}
       {!isDemo ? (
-        <View style={{ marginTop: 32 }}>
+        <View style={{ marginTop: 32, gap: 16 }}>
           <Button
             label="Sign out"
             variant="secondary"
@@ -165,6 +197,7 @@ export default function SettingsScreen() {
               }
             }}
           />
+          <Button label="Delete account and wardrobe" variant="danger" onPress={() => setSheet('delete')} />
         </View>
       ) : null}
       <View style={{ marginTop: 40, alignItems: 'center', gap: 8 }}>
@@ -207,9 +240,9 @@ export default function SettingsScreen() {
         </AppText>
         <AppText variant="bodyLarge">What stays on this device</AppText>
         <AppText variant="muted">
-          Saved looks, favorites, and appearance preferences use this app’s local storage. They do
-          not sync to other devices. Clearing app or browser data removes them. Saved looks and
-          favorites are kept separately for each account.
+          {isDemo
+            ? 'Demo saved looks, favorites, and appearance preferences are stored on this device. Clearing app or browser data removes them.'
+            : 'Saved looks and favorites sync with your account. Appearance preferences stay on this device. An older device-only collection can be imported above.'}
         </AppText>
         <AppText variant="bodyLarge">You choose the context</AppText>
         <AppText variant="muted">
@@ -232,6 +265,27 @@ export default function SettingsScreen() {
         </AppText>
       </BottomSheet>
       <SavedLooksSheet visible={sheet === 'saved'} onClose={() => setSheet(null)} />
+      <BottomSheet visible={sheet === 'delete'} title="Delete your account?"
+        subtitle="This removes your wardrobe, saved looks, activity, and private photos. It cannot be undone."
+        onClose={() => { if (!deleting) { setSheet(null); setDeletePhrase(''); } }}>
+        <AppText variant="muted">Export your account details first if you want a copy. Type DELETE to confirm.</AppText>
+        <TextField label="Confirmation" value={deletePhrase} onChangeText={setDeletePhrase}
+          editable={!deleting} autoCapitalize="characters" />
+        <Button label="Permanently delete account" variant="danger" loading={deleting}
+          disabled={deletePhrase !== 'DELETE' || deleting}
+          onPress={async () => {
+            if (deletePhrase !== 'DELETE' || deleting) return;
+            setDeleting(true);
+            try {
+              await deleteAccount();
+              setSheet(null);
+              router.replace('/sign-in');
+            } catch {
+              setError('Could not finish deleting your account. Your data may need another attempt; please retry while connected.');
+              setSheet(null);
+            } finally { setDeleting(false); }
+          }} />
+      </BottomSheet>
     </Screen>
   );
 }

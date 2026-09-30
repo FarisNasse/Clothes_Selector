@@ -205,8 +205,8 @@ export default function WardrobeScreen() {
             width={tileWidth}
             editorial={view === 'closet'}
             favorite={favorites.includes(item.id)}
-            onFavorite={() => {
-              if (toggleFavorite(item.id)) haptic();
+            onFavorite={async () => {
+              if (await toggleFavorite(item.id)) haptic();
             }}
             onPress={() => router.push({ pathname: '/garment/[id]', params: { id: item.id } })}
             onStyle={() => router.push({ pathname: '/garment/[id]', params: { id: item.id, style: '1' } })}

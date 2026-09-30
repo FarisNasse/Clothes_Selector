@@ -34,6 +34,7 @@ function rowToGarment(row: Record<string, unknown>): Garment {
     wearCount: Number(row.wear_count ?? 0),
     lastWornAt: row.last_worn_at ? String(row.last_worn_at) : null,
     aiConfidence: row.ai_confidence === null ? null : Number(row.ai_confidence),
+    confirmedFields: (row.confirmed_fields as Garment['confirmedFields']) ?? [],
   };
 }
 
@@ -95,6 +96,7 @@ function draftToChanges(draft: GarmentDraft) {
     storage_path: draft.storagePath,
     purchase_price: draft.purchasePrice,
     ai_confidence: draft.aiConfidence,
+    confirmed_fields: draft.confirmedFields ?? [],
   };
 }
 

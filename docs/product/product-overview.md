@@ -16,7 +16,8 @@ Clothes Selector helps a user organize clothing they already own and decide what
 - Outfit generation uses deterministic client-side rules and scoring.
 - Connected mode persists garments and photos through Supabase.
 - Demo mode uses sample data and session-only garment changes.
-- Saved looks and favorites are device-local.
+- Signed-in saved looks and favorites sync through account-scoped tables; demo collections remain on the device. Older device-only collections can be imported in Settings.
+- Style intensity, skipped garments for this look, and an optional confirmed rain requirement give the wearer more control. Explanations cite recorded pieces and attributes.
 - Weather/context inputs are user-selected; the app does not fetch live weather or location.
 - No AI API, commerce feed, social network, calendar integration, or recommendation analytics is required by the current experience.
 
@@ -34,4 +35,4 @@ The product hypothesis is that a useful recommendation becomes valuable when a u
 
 ## Out of scope for the current build
 
-Automated photo classification, AI-generated advice, live weather, shopping recommendations, social features, and cross-device saved-look sync are not current capabilities. Historical concept material is retained in [the archive](../archive/README.md).
+Automated photo classification, AI-generated advice, live weather, shopping recommendations, and social features are not current capabilities. Historical concept material is retained in [the archive](../archive/README.md).

@@ -5,20 +5,32 @@
   },
   "build": {
     "development": {
+      "node": "22.16.0",
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development"
+      "channel": "development",
+      "environment": "development",
+      "env": { "EXPO_PUBLIC_APP_ENV": "demo", "EXPO_PUBLIC_DEMO_MODE": "true" }
     },
     "preview": {
+      "node": "22.16.0",
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "environment": "development",
+      "env": { "EXPO_PUBLIC_APP_ENV": "demo", "EXPO_PUBLIC_DEMO_MODE": "true" }
     },
     "staging": {
+      "node": "22.16.0",
       "distribution": "internal",
-      "channel": "staging"
+      "channel": "staging",
+      "environment": "preview",
+      "env": { "EXPO_PUBLIC_APP_ENV": "staging", "EXPO_PUBLIC_DEMO_MODE": "false" }
     },
     "production": {
+      "node": "22.16.0",
       "channel": "production",
+      "environment": "production",
+      "env": { "EXPO_PUBLIC_APP_ENV": "production", "EXPO_PUBLIC_DEMO_MODE": "false" },
       "autoIncrement": true
     }
   },

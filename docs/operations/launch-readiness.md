@@ -16,7 +16,8 @@ This checklist separates current release obligations from features that are alre
 - [ ] Exercise database RLS and Storage policies with two independent users.
 - [ ] Confirm no privileged key appears in source maps, web bundles, native app bundles, logs, or CI artifacts.
 - [ ] Verify the deployed schema and Storage policy state matches reviewed migrations.
-- [ ] Implement and test account deletion, including database rows and photo objects.
+- [ ] Deploy and test account deletion, including database rows, all photo objects, token expiry behavior, and a retry after interrupted cleanup.
+- [ ] Validate JSON account export completeness and the disclosed absence of photo bytes.
 - [ ] Define and publish privacy policy, data retention, data export, and store disclosures.
 - [ ] Decide image metadata handling and test the chosen behavior.
 - [ ] Establish incident response, support contact, and production backup/restore procedures.
@@ -28,6 +29,7 @@ This checklist separates current release obligations from features that are alre
 - [ ] Verify VoiceOver/TalkBack, keyboard navigation on web, reduced motion, and larger text.
 - [ ] Define production monitoring and support workflows; configure them if needed.
 - [ ] Test network loss, storage/database failures, session expiry, and migration rollout/recovery.
+- [ ] Confirm the staging and production builds use different projects and the correct EAS environments.
 - [ ] Add end-to-end smoke automation for sign-in → add garment → recommend → record wear.
 
 ## Release operations

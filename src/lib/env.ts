@@ -1,17 +1,20 @@
-const DEFAULT_SUPABASE_URL = 'https://timgqrbsczlvoopmsobr.supabase.co';
-const DEFAULT_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_ZTa8xIEj2Q3Lz_cuS7c7-Q_F7hLx_ey';
-
-// Clothes Selector runs against its dedicated Supabase project by default.
-// EXPO_PUBLIC_* variables may override these public client values for other environments.
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() || DEFAULT_SUPABASE_URL;
-const supabasePublishableKey =
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() || DEFAULT_SUPABASE_PUBLISHABLE_KEY;
+// A connected build must explicitly select its project. Public keys are safe to ship,
+// but silently falling back to a production project is not safe for staging data.
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
+const supabasePublishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? '';
+const demoMode = process.env.EXPO_PUBLIC_DEMO_MODE !== 'false';
+const appEnv = process.env.EXPO_PUBLIC_APP_ENV ?? 'development';
+if (!demoMode && (!supabaseUrl || !supabasePublishableKey)) {
+  throw new Error('Connected mode requires EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.');
+}
+if (appEnv === 'production' && demoMode) {
+  throw new Error('Production builds must explicitly set EXPO_PUBLIC_DEMO_MODE=false.');
+}
 
 export const env = {
-  appEnv: process.env.EXPO_PUBLIC_APP_ENV ?? 'development',
+  appEnv,
   supabaseUrl,
   supabasePublishableKey,
-  isSupabaseConfigured: true,
-  // A missing .env starts in demo mode; connected mode requires an explicit false.
-  demoMode: process.env.EXPO_PUBLIC_DEMO_MODE !== 'false',
+  isSupabaseConfigured: Boolean(supabaseUrl && supabasePublishableKey),
+  demoMode,
 } as const;

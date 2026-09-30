@@ -24,7 +24,7 @@ Open **Style** and show editable preferences and wardrobe-derived summaries. Exp
 
 ## 4:20 — You, saved looks, and privacy
 
-Open **You**. Show saved looks, preferences, and appearance controls. Explain that saved looks/favorites are stored on the device and are not synced across devices. In connected mode, garment images use a private bucket and database rows are protected by user-scoped policies.
+Open **You**. Show saved looks, preferences, and appearance controls. Demo collections are device-local; connected collections sync with the account. In connected mode, garment images use a private bucket and database rows are protected by user-scoped policies.
 
 ## Closing
 

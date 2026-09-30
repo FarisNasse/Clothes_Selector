@@ -5,10 +5,12 @@ import { EmptyState } from '@/components/primitives/EmptyState';
 import { OutfitSkeleton } from '@/components/primitives/Skeleton';
 import { StylingStudio } from '@/components/styling/StylingStudio';
 import { useCollection } from '@/providers/CollectionProvider';
+import { useSession } from '@/providers/SessionProvider';
 import { useWardrobe } from '@/providers/WardrobeProvider';
 export default function SavedLookScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { looks, loading: collectionLoading } = useCollection();
+  const { looks, loading: collectionLoading, error: collectionError, retry } = useCollection();
+  const { isDemo } = useSession();
   const { garments, loading } = useWardrobe();
   const look = looks.find((item) => item.id === id);
   if (loading || collectionLoading)
@@ -17,12 +19,15 @@ export default function SavedLookScreen() {
         <OutfitSkeleton />
       </Screen>
     );
+  if (collectionError && !look)
+    return <Screen><EmptyState title="Saved looks are unavailable."
+      detail={collectionError} actionLabel="Try again" onAction={retry} /></Screen>;
   const missing =
     look?.garmentIds.filter((garmentId) => !garments.some((item) => item.id === garmentId))
       .length ?? 0;
   return (
     <Screen>
-      <PageHeading eyebrow="Saved on this device" title="Worth another wear." />
+      <PageHeading eyebrow={isDemo ? 'Saved on this device' : 'Saved to your account'} title="Worth another wear." />
       {look && !missing ? (
         <StylingStudio initialLook={look} />
       ) : (
